@@ -30,6 +30,8 @@
     "cors": "^2.8.5",
     "d3-force": "^3.0.0",
     "express": "^4.21.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
     "ws": "^8.18.1"
   },
   "devDependencies": {
@@ -44,8 +46,6 @@
     "concurrently": "^9.1.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tsx": "^4.19.3",
-    "typescript": "^5.7.3",
     "vite": "^6.2.4"
   }
 }

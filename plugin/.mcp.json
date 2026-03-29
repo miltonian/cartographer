@@ -2,7 +2,7 @@
   "mcpServers": {
     "cartographer": {
       "command": "sh",
-      "args": ["-c", "\"${CLAUDE_PLUGIN_ROOT}/../node_modules/.bin/tsx\" \"${CLAUDE_PLUGIN_ROOT}/../src/index.ts\""],
+      "args": ["${CLAUDE_PLUGIN_ROOT}/start.sh"],
       "env": {
         "CARTOGRAPHER_PORT": "3847"
       }
