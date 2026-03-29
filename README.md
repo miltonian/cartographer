@@ -71,7 +71,18 @@ Ask Claude questions — answers cite the stored model.
 - [Node.js](https://nodejs.org/) 20+
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 
-### Install
+### Install via Plugin Marketplace
+
+In Claude Code, run:
+
+```
+/plugin marketplace add miltonian/cartographer
+/plugin install cartographer@cartographer
+```
+
+Then in your project directory, run `npm install` inside the plugin's service directory (the marketplace will tell you the path), or use the development install below.
+
+### Install from Source
 
 ```bash
 git clone https://github.com/miltonian/cartographer.git
@@ -80,15 +91,13 @@ npm install
 npm run build:ui
 ```
 
-### Run
-
-Start Claude Code with the Cartographer plugin:
+Then start Claude Code with the plugin:
 
 ```bash
 claude --plugin-dir ./plugin
 ```
 
-Then analyze any codebase:
+### Use
 
 ```
 /cartographer analyze
