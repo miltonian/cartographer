@@ -11,6 +11,10 @@ Navigate it as a map. Inspect it down to source. Ask questions grounded in truth
 
 <br />
 
+![Cartographer map view](docs/assets/cartographer-map.png)
+
+<br />
+
 [Getting Started](#getting-started) ·
 [How It Works](#how-it-works) ·
 [Architecture](#architecture) ·
