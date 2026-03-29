@@ -1,7 +1,20 @@
 {
   "name": "cartographer",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miltonian/cartographer.git"
+  },
+  "keywords": [
+    "code-understanding",
+    "codebase-visualization",
+    "world-model",
+    "claude-code",
+    "mcp",
+    "semantic-map",
+    "developer-tools"
+  ],
   "type": "module",
   "scripts": {
     "dev": "concurrently -n svc,ui -c blue,green \"npm run dev:service\" \"npm run dev:ui\"",
