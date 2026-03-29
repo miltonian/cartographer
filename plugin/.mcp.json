@@ -4,7 +4,6 @@
       "command": "sh",
       "args": ["${CLAUDE_PLUGIN_ROOT}/start.sh"],
       "env": {
-        "CARTOGRAPHER_PORT": "3847",
         "CARTOGRAPHER_DATA": "${CLAUDE_PLUGIN_DATA}"
       }
     }
