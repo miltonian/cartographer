@@ -36,7 +36,10 @@ const mcpServer = new Server(
   { capabilities: { tools: {} } },
 );
 
-// Tools are registered after HTTP server starts (needs actual port for open_map)
+// Register tools immediately so they're available when Claude Code connects.
+// The open_map tool reads the port file at call time, not at registration time.
+registerTools(mcpServer, store, DATA_DIR);
+
 const transport = new StdioServerTransport();
 mcpServer.connect(transport).then(() => {
   log('MCP server connected (stdio)');
@@ -88,12 +91,9 @@ function startHttpServer(port: number, retries = 10): Promise<{ server: ReturnTy
 const { server: httpServer, port: actualPort } = await startHttpServer(PREFERRED_PORT);
 log(`HTTP server: http://localhost:${actualPort}`);
 
-// Write the active port so scripts/browser can find it
+// Write the active port so the open_map tool and scripts can find it
 const portFile = path.join(DATA_DIR, 'port');
 fs.writeFileSync(portFile, String(actualPort), 'utf-8');
-
-// Update the MCP tools with the actual port
-registerTools(mcpServer, store, actualPort);
 
 // ─── WebSocket ─────────────────────────────────────────────────
 

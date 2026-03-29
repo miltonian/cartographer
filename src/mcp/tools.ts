@@ -16,6 +16,8 @@ import {
   type SourceAnchor,
 } from '../ontology.js';
 import { execFile } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // ─── Schema Fragments ──────────────────────────────────────────
 
@@ -255,7 +257,15 @@ const TOOLS = [
 
 // ─── Register Tools ────────────────────────────────────────────
 
-export function registerTools(server: Server, store: WorldModelStore, port: number): void {
+export function registerTools(server: Server, store: WorldModelStore, dataDir: string): void {
+  // Read port from file at call time (written by HTTP server after it binds)
+  function getPort(): number {
+    try {
+      return parseInt(fs.readFileSync(path.join(dataDir, 'port'), 'utf-8').trim(), 10);
+    } catch {
+      return 3847; // fallback
+    }
+  }
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: TOOLS,
   }));
@@ -440,9 +450,10 @@ export function registerTools(server: Server, store: WorldModelStore, port: numb
 
       case 'cartographer_open_map': {
         const { focus } = (args ?? {}) as { focus?: string };
+        const activePort = getPort();
         const url = focus
-          ? `http://localhost:${port}?focus=${encodeURIComponent(focus)}`
-          : `http://localhost:${port}`;
+          ? `http://localhost:${activePort}?focus=${encodeURIComponent(focus)}`
+          : `http://localhost:${activePort}`;
 
         // Open browser safely using execFile (no shell injection)
         const cmd = process.platform === 'darwin'
