@@ -219,6 +219,21 @@ const TOOLS = [
     },
   },
   {
+    name: 'cartographer_set_project',
+    description:
+      'Set the project root for the current analysis session. MUST be called before writing any entities. Pass the absolute path to the project being analyzed. This stores the world-model in {projectRoot}/.cartographer/model.json and loads any existing model for that project.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        rootPath: {
+          type: 'string' as const,
+          description: 'Absolute path to the project root (e.g., "/Users/me/my-project")',
+        },
+      },
+      required: ['rootPath'],
+    },
+  },
+  {
     name: 'cartographer_get_summary',
     description: 'Get current world-model statistics: entity/relationship counts, confidence distribution.',
     inputSchema: {
@@ -439,6 +454,25 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
         }
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(details) }],
+        };
+      }
+
+      case 'cartographer_set_project': {
+        const { rootPath } = args as { rootPath: string };
+        store.setProject(rootPath);
+        const summary = store.getSummary();
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                rootPath,
+                loaded: summary.entityCount > 0,
+                entityCount: summary.entityCount,
+                relationshipCount: summary.relationshipCount,
+              }),
+            },
+          ],
         };
       }
 

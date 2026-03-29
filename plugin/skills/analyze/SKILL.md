@@ -13,6 +13,7 @@ findings as structured facts.
 
 ## Available MCP Tools
 
+- `cartographer_set_project` — **Call first.** Sets the project root so the model is stored in the right place.
 - `cartographer_write_entity` — Record an entity (boundary, capability, actor, entity, etc.)
 - `cartographer_write_relationship` — Record a relationship between entities
 - `cartographer_write_slice` — Record a behavior flow (ordered path through entities)
@@ -23,6 +24,15 @@ findings as structured facts.
 - `cartographer_clear` — Reset the model (destructive)
 
 ## Analysis Workflow
+
+### 0. Set Project
+**Before anything else**, call `cartographer_set_project` with the absolute path to the
+project you're analyzing. This ensures the world-model is stored in `{project}/.cartographer/`
+and loads any existing model for that project.
+
+```
+cartographer_set_project(rootPath: "/Users/me/my-project")
+```
 
 ### 1. Orient
 Read the project root: README, package.json or equivalent, top-level directory structure.

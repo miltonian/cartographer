@@ -68,15 +68,16 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private evidenceCounter = 0;
 
-  constructor(rootPath: string, dataDir: string) {
+  constructor(rootPath: string, dataDir?: string) {
     super();
     this.rootPath = rootPath;
-    this.persistPath = path.join(dataDir, 'model.json');
+    const resolvedDataDir = dataDir ?? path.join(rootPath, '.cartographer');
+    this.persistPath = path.join(resolvedDataDir, 'model.json');
     this.modelId = `model:${path.basename(rootPath)}`;
     this.createdAt = new Date().toISOString();
     this.updatedAt = this.createdAt;
 
-    fs.mkdirSync(dataDir, { recursive: true });
+    fs.mkdirSync(resolvedDataDir, { recursive: true });
     this.loadFromDisk();
   }
 
@@ -340,6 +341,27 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
 
   // ─── Model Management ─────────────────────────────────────
 
+  setProject(rootPath: string): void {
+    // Persist current model before switching
+    this.persistToDisk();
+    // Reset in-memory state
+    this.entities.clear();
+    this.relationships.clear();
+    this.slices.clear();
+    this.evidenceCounter = 0;
+    // Rebind to new project
+    this.rootPath = rootPath;
+    const dataDir = path.join(rootPath, '.cartographer');
+    fs.mkdirSync(dataDir, { recursive: true });
+    this.persistPath = path.join(dataDir, 'model.json');
+    this.modelId = `model:${path.basename(rootPath)}`;
+    this.createdAt = new Date().toISOString();
+    this.updatedAt = this.createdAt;
+    // Load existing model for this project if it exists
+    this.loadFromDisk();
+    this.emit('model:cleared'); // Signal UI to refresh
+  }
+
   getSlices(): BehaviorSlice[] {
     return Array.from(this.slices.values());
   }
@@ -405,9 +427,9 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
 
   private markDirty(): void {
     this.updatedAt = new Date().toISOString();
-    if (!this.persistTimer) {
-      this.persistTimer = setTimeout(() => this.persistToDisk(), 1000);
-    }
+    // Persist synchronously on every write. A model with hundreds of entities
+    // serializes in <5ms, and data loss from kill -9 is worse than a small write cost.
+    this.persistToDisk();
   }
 
   persistToDisk(): void {
