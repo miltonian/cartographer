@@ -1,0 +1,441 @@
+import { EventEmitter } from 'events';
+import * as fs from 'fs';
+import * as path from 'path';
+import {
+  type WorldEntity,
+  type WorldRelationship,
+  type WorldModelSnapshot,
+  type ModelSummary,
+  type Evidence,
+  type EntityKind,
+  type RelationshipKind,
+  type Confidence,
+  type BehaviorSlice,
+  type SliceStep,
+  CONFIDENCE_RANK,
+} from './ontology.js';
+
+// ─── Query Types ───────────────────────────────────────────────
+
+export interface EntityQuery {
+  kind?: EntityKind;
+  namePattern?: string;  // regex
+  involves?: string;     // entity ID (as source or target in any relationship)
+  minConfidence?: Confidence;
+  parentBoundary?: string;
+  limit?: number;
+}
+
+export interface RelationshipQuery {
+  kind?: RelationshipKind;
+  source?: string;
+  target?: string;
+  involves?: string;  // either source or target
+  minConfidence?: Confidence;
+  limit?: number;
+}
+
+export interface EntityDetails {
+  entity: WorldEntity;
+  incoming: WorldRelationship[];
+  outgoing: WorldRelationship[];
+  relatedEntities: WorldEntity[];
+}
+
+// ─── Store Events ──────────────────────────────────────────────
+
+export interface StoreEvents {
+  'entity:added': [entity: WorldEntity];
+  'entity:updated': [entity: WorldEntity];
+  'relationship:added': [relationship: WorldRelationship];
+  'relationship:updated': [relationship: WorldRelationship];
+  'slice:added': [slice: BehaviorSlice];
+  'slice:updated': [slice: BehaviorSlice];
+  'model:cleared': [];
+}
+
+// ─── World Model Store ─────────────────────────────────────────
+
+export class WorldModelStore extends EventEmitter<StoreEvents> {
+  private entities = new Map<string, WorldEntity>();
+  private relationships = new Map<string, WorldRelationship>();
+  private slices = new Map<string, BehaviorSlice>();
+  private modelId: string;
+  private rootPath: string;
+  private persistPath: string;
+  private createdAt: string;
+  private updatedAt: string;
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private evidenceCounter = 0;
+
+  constructor(rootPath: string, dataDir: string) {
+    super();
+    this.rootPath = rootPath;
+    this.persistPath = path.join(dataDir, 'model.json');
+    this.modelId = `model:${path.basename(rootPath)}`;
+    this.createdAt = new Date().toISOString();
+    this.updatedAt = this.createdAt;
+
+    fs.mkdirSync(dataDir, { recursive: true });
+    this.loadFromDisk();
+  }
+
+  // ─── Write Operations ──────────────────────────────────────
+
+  writeEntity(input: {
+    kind: EntityKind;
+    name: string;
+    description?: string;
+    evidence: Omit<Evidence, 'id' | 'createdAt'>;
+    parentBoundary?: string;
+    metadata?: Record<string, unknown>;
+  }): { id: string; created: boolean } {
+    const id = this.entityId(input.kind, input.name);
+    const now = new Date().toISOString();
+    const evidenceEntry: Evidence = {
+      ...input.evidence,
+      id: this.nextEvidenceId(),
+      createdAt: now,
+    };
+
+    const existing = this.entities.get(id);
+    if (existing) {
+      // Update: append evidence, merge description/metadata
+      existing.evidence.push(evidenceEntry);
+      if (input.description) existing.description = input.description;
+      if (input.parentBoundary) existing.parentBoundary = input.parentBoundary;
+      if (input.metadata) {
+        existing.metadata = { ...existing.metadata, ...input.metadata };
+      }
+      existing.updatedAt = now;
+      this.markDirty();
+      this.emit('entity:updated', existing);
+      return { id, created: false };
+    }
+
+    const entity: WorldEntity = {
+      id,
+      kind: input.kind,
+      name: input.name,
+      description: input.description,
+      evidence: [evidenceEntry],
+      parentBoundary: input.parentBoundary,
+      metadata: input.metadata,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.entities.set(id, entity);
+    this.markDirty();
+    this.emit('entity:added', entity);
+    return { id, created: true };
+  }
+
+  writeRelationship(input: {
+    kind: RelationshipKind;
+    source: string;
+    target: string;
+    description?: string;
+    evidence: Omit<Evidence, 'id' | 'createdAt'>;
+    metadata?: Record<string, unknown>;
+  }): { id: string; created: boolean } {
+    const baseId = `${input.source}>${input.kind}>${input.target}`;
+    const now = new Date().toISOString();
+    const evidenceEntry: Evidence = {
+      ...input.evidence,
+      id: this.nextEvidenceId(),
+      createdAt: now,
+    };
+
+    const existing = this.relationships.get(baseId);
+    if (existing) {
+      existing.evidence.push(evidenceEntry);
+      if (input.description) existing.description = input.description;
+      if (input.metadata) {
+        existing.metadata = { ...existing.metadata, ...input.metadata };
+      }
+      existing.updatedAt = now;
+      this.markDirty();
+      this.emit('relationship:updated', existing);
+      return { id: baseId, created: false };
+    }
+
+    const rel: WorldRelationship = {
+      id: baseId,
+      kind: input.kind,
+      source: input.source,
+      target: input.target,
+      description: input.description,
+      evidence: [evidenceEntry],
+      metadata: input.metadata,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.relationships.set(baseId, rel);
+    this.markDirty();
+    this.emit('relationship:added', rel);
+    return { id: baseId, created: true };
+  }
+
+  writeSlice(input: {
+    name: string;
+    description?: string;
+    steps: SliceStep[];
+    evidence: Omit<Evidence, 'id' | 'createdAt'>;
+  }): { id: string; created: boolean } {
+    const id = `slice:${input.name}`;
+    const now = new Date().toISOString();
+    const evidenceEntry: Evidence = {
+      ...input.evidence,
+      id: this.nextEvidenceId(),
+      createdAt: now,
+    };
+
+    const existing = this.slices.get(id);
+    if (existing) {
+      existing.steps = input.steps;
+      existing.evidence.push(evidenceEntry);
+      if (input.description) existing.description = input.description;
+      existing.updatedAt = now;
+      this.markDirty();
+      this.emit('slice:updated', existing);
+      return { id, created: false };
+    }
+
+    const slice: BehaviorSlice = {
+      id,
+      name: input.name,
+      description: input.description,
+      steps: input.steps,
+      evidence: [evidenceEntry],
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.slices.set(id, slice);
+    this.markDirty();
+    this.emit('slice:added', slice);
+    return { id, created: true };
+  }
+
+  // ─── Read Operations ───────────────────────────────────────
+
+  getEntity(id: string): WorldEntity | undefined {
+    return this.entities.get(id);
+  }
+
+  getEntityDetails(id: string): EntityDetails | null {
+    const entity = this.entities.get(id);
+    if (!entity) return null;
+
+    const incoming: WorldRelationship[] = [];
+    const outgoing: WorldRelationship[] = [];
+    const relatedIds = new Set<string>();
+
+    for (const rel of this.relationships.values()) {
+      if (rel.target === id) {
+        incoming.push(rel);
+        relatedIds.add(rel.source);
+      }
+      if (rel.source === id) {
+        outgoing.push(rel);
+        relatedIds.add(rel.target);
+      }
+    }
+
+    const relatedEntities = Array.from(relatedIds)
+      .map(rid => this.entities.get(rid))
+      .filter((e): e is WorldEntity => e !== undefined);
+
+    return { entity, incoming, outgoing, relatedEntities };
+  }
+
+  queryEntities(query: EntityQuery): WorldEntity[] {
+    const limit = query.limit ?? 50;
+    const results: WorldEntity[] = [];
+    const minRank = query.minConfidence
+      ? CONFIDENCE_RANK[query.minConfidence]
+      : 0;
+
+    // If `involves` is set, find all entities connected to that entity
+    let involvedIds: Set<string> | null = null;
+    if (query.involves) {
+      involvedIds = new Set<string>();
+      for (const rel of this.relationships.values()) {
+        if (rel.source === query.involves) involvedIds.add(rel.target);
+        if (rel.target === query.involves) involvedIds.add(rel.source);
+      }
+    }
+
+    const nameRegex = query.namePattern
+      ? new RegExp(query.namePattern, 'i')
+      : null;
+
+    for (const entity of this.entities.values()) {
+      if (results.length >= limit) break;
+      if (query.kind && entity.kind !== query.kind) continue;
+      if (nameRegex && !nameRegex.test(entity.name)) continue;
+      if (query.parentBoundary && entity.parentBoundary !== query.parentBoundary) continue;
+      if (involvedIds && !involvedIds.has(entity.id)) continue;
+      if (minRank > 0) {
+        const best = this.bestConfidence(entity.evidence);
+        if (CONFIDENCE_RANK[best] < minRank) continue;
+      }
+      results.push(entity);
+    }
+    return results;
+  }
+
+  queryRelationships(query: RelationshipQuery): WorldRelationship[] {
+    const limit = query.limit ?? 50;
+    const results: WorldRelationship[] = [];
+    const minRank = query.minConfidence
+      ? CONFIDENCE_RANK[query.minConfidence]
+      : 0;
+
+    for (const rel of this.relationships.values()) {
+      if (results.length >= limit) break;
+      if (query.kind && rel.kind !== query.kind) continue;
+      if (query.source && rel.source !== query.source) continue;
+      if (query.target && rel.target !== query.target) continue;
+      if (query.involves && rel.source !== query.involves && rel.target !== query.involves) continue;
+      if (minRank > 0) {
+        const best = this.bestConfidence(rel.evidence);
+        if (CONFIDENCE_RANK[best] < minRank) continue;
+      }
+      results.push(rel);
+    }
+    return results;
+  }
+
+  getSummary(): ModelSummary {
+    const entitiesByKind: Partial<Record<EntityKind, number>> = {};
+    const relationshipsByKind: Partial<Record<RelationshipKind, number>> = {};
+    const confidenceDistribution: Partial<Record<Confidence, number>> = {};
+
+    for (const e of this.entities.values()) {
+      entitiesByKind[e.kind] = (entitiesByKind[e.kind] ?? 0) + 1;
+      for (const ev of e.evidence) {
+        confidenceDistribution[ev.confidence] =
+          (confidenceDistribution[ev.confidence] ?? 0) + 1;
+      }
+    }
+    for (const r of this.relationships.values()) {
+      relationshipsByKind[r.kind] = (relationshipsByKind[r.kind] ?? 0) + 1;
+      for (const ev of r.evidence) {
+        confidenceDistribution[ev.confidence] =
+          (confidenceDistribution[ev.confidence] ?? 0) + 1;
+      }
+    }
+
+    return {
+      projectRoot: this.rootPath,
+      entityCount: this.entities.size,
+      relationshipCount: this.relationships.size,
+      sliceCount: this.slices.size,
+      entitiesByKind,
+      relationshipsByKind,
+      confidenceDistribution,
+      lastUpdated: this.updatedAt,
+    };
+  }
+
+  // ─── Model Management ─────────────────────────────────────
+
+  getSlices(): BehaviorSlice[] {
+    return Array.from(this.slices.values());
+  }
+
+  clear(): void {
+    this.entities.clear();
+    this.relationships.clear();
+    this.slices.clear();
+    this.evidenceCounter = 0;
+    this.updatedAt = new Date().toISOString();
+    this.markDirty();
+    this.emit('model:cleared');
+  }
+
+  getSnapshot(): WorldModelSnapshot {
+    return {
+      id: this.modelId,
+      rootPath: this.rootPath,
+      entities: Array.from(this.entities.values()),
+      relationships: Array.from(this.relationships.values()),
+      slices: Array.from(this.slices.values()),
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+    };
+  }
+
+  // ─── Persistence ───────────────────────────────────────────
+
+  private loadFromDisk(): void {
+    if (!fs.existsSync(this.persistPath)) return;
+    try {
+      const raw = fs.readFileSync(this.persistPath, 'utf-8');
+      const data: WorldModelSnapshot = JSON.parse(raw);
+      this.modelId = data.id;
+      this.createdAt = data.createdAt;
+      this.updatedAt = data.updatedAt;
+      for (const e of data.entities) {
+        this.entities.set(e.id, e);
+      }
+      for (const r of data.relationships) {
+        this.relationships.set(r.id, r);
+      }
+      for (const s of data.slices ?? []) {
+        this.slices.set(s.id, s);
+      }
+      // Restore evidence counter from existing evidence IDs
+      for (const e of data.entities) {
+        for (const ev of e.evidence) {
+          const num = parseInt(ev.id.replace('ev:', ''), 10);
+          if (num >= this.evidenceCounter) this.evidenceCounter = num + 1;
+        }
+      }
+      for (const r of data.relationships) {
+        for (const ev of r.evidence) {
+          const num = parseInt(ev.id.replace('ev:', ''), 10);
+          if (num >= this.evidenceCounter) this.evidenceCounter = num + 1;
+        }
+      }
+    } catch {
+      // Corrupted file — start fresh
+    }
+  }
+
+  private markDirty(): void {
+    this.updatedAt = new Date().toISOString();
+    if (!this.persistTimer) {
+      this.persistTimer = setTimeout(() => this.persistToDisk(), 1000);
+    }
+  }
+
+  persistToDisk(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+    const snapshot = this.getSnapshot();
+    fs.writeFileSync(this.persistPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────
+
+  private entityId(kind: EntityKind, name: string): string {
+    return `${kind}:${name}`;
+  }
+
+  private nextEvidenceId(): string {
+    return `ev:${this.evidenceCounter++}`;
+  }
+
+  private bestConfidence(evidence: Evidence[]): Confidence {
+    let best: Confidence = 'speculative';
+    for (const ev of evidence) {
+      if (CONFIDENCE_RANK[ev.confidence] > CONFIDENCE_RANK[best]) {
+        best = ev.confidence;
+      }
+    }
+    return best;
+  }
+}

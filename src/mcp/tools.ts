@@ -1,0 +1,491 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import { type WorldModelStore } from '../store.js';
+import {
+  ENTITY_KINDS,
+  RELATIONSHIP_KINDS,
+  CONFIDENCE_LEVELS,
+  PROVENANCE_KINDS,
+  type EntityKind,
+  type RelationshipKind,
+  type Confidence,
+  type Provenance,
+  type SourceAnchor,
+} from '../ontology.js';
+import { execFile } from 'child_process';
+
+// ─── Schema Fragments ──────────────────────────────────────────
+
+const anchorSchema = {
+  type: 'object' as const,
+  properties: {
+    filePath: { type: 'string' as const, description: 'Path relative to project root' },
+    lineStart: { type: 'number' as const },
+    lineEnd: { type: 'number' as const },
+    snippet: { type: 'string' as const, description: 'Verbatim source text' },
+  },
+  required: ['filePath', 'lineStart', 'lineEnd', 'snippet'],
+};
+
+const evidenceSchema = {
+  type: 'object' as const,
+  properties: {
+    anchors: {
+      type: 'array' as const,
+      items: anchorSchema,
+      description: 'Source locations grounding this fact',
+    },
+    confidence: {
+      type: 'string' as const,
+      enum: [...CONFIDENCE_LEVELS],
+      description: 'proven=from source, high=one inference step, medium/low=weaker, speculative=hypothesis',
+    },
+    provenance: {
+      type: 'string' as const,
+      enum: [...PROVENANCE_KINDS],
+      description: 'How this fact was established',
+    },
+    reasoning: {
+      type: 'string' as const,
+      description: 'Required when confidence is not proven. Explain the inference.',
+    },
+    supportingFacts: {
+      type: 'array' as const,
+      items: { type: 'string' as const },
+      description: 'IDs of facts this was inferred from',
+    },
+  },
+  required: ['anchors', 'confidence', 'provenance'],
+};
+
+// ─── Tool Definitions ──────────────────────────────────────────
+
+const TOOLS = [
+  {
+    name: 'cartographer_write_entity',
+    description:
+      'Record a discovered entity in the world-model. Creates if new (by kind+name), appends evidence if existing. Every entity must have at least one source anchor.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        kind: {
+          type: 'string' as const,
+          enum: [...ENTITY_KINDS],
+          description: 'The ontological kind of entity',
+        },
+        name: {
+          type: 'string' as const,
+          description: 'Human-readable identifier (e.g., "auth", "createOrder", "UserSession")',
+        },
+        description: {
+          type: 'string' as const,
+          description: 'What this entity is or does',
+        },
+        evidence: evidenceSchema,
+        parentBoundary: {
+          type: 'string' as const,
+          description: 'Entity ID of the containing boundary (e.g., "boundary:auth")',
+        },
+        metadata: {
+          type: 'object' as const,
+          description: 'Optional key-value pairs',
+        },
+      },
+      required: ['kind', 'name', 'evidence'],
+    },
+  },
+  {
+    name: 'cartographer_write_relationship',
+    description:
+      'Record a relationship between two entities. Source and target must be entity IDs (e.g., "capability:createOrder"). Appends evidence if relationship already exists.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        kind: {
+          type: 'string' as const,
+          enum: [...RELATIONSHIP_KINDS],
+          description: 'The kind of relationship',
+        },
+        source: {
+          type: 'string' as const,
+          description: 'Source entity ID',
+        },
+        target: {
+          type: 'string' as const,
+          description: 'Target entity ID',
+        },
+        description: {
+          type: 'string' as const,
+          description: 'What this relationship means',
+        },
+        evidence: evidenceSchema,
+      },
+      required: ['kind', 'source', 'target', 'evidence'],
+    },
+  },
+  {
+    name: 'cartographer_query',
+    description:
+      'Query the world-model for entities and relationships matching criteria.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        entityKind: {
+          type: 'string' as const,
+          enum: [...ENTITY_KINDS],
+          description: 'Filter entities by kind',
+        },
+        relationshipKind: {
+          type: 'string' as const,
+          enum: [...RELATIONSHIP_KINDS],
+          description: 'Filter relationships by kind',
+        },
+        involves: {
+          type: 'string' as const,
+          description: 'Entity ID that must be source or target',
+        },
+        namePattern: {
+          type: 'string' as const,
+          description: 'Regex to match entity names',
+        },
+        minConfidence: {
+          type: 'string' as const,
+          enum: [...CONFIDENCE_LEVELS],
+          description: 'Minimum confidence level',
+        },
+        limit: {
+          type: 'number' as const,
+          description: 'Max results (default 50)',
+        },
+      },
+    },
+  },
+  {
+    name: 'cartographer_write_slice',
+    description:
+      'Record a behavior slice — a named storyline showing what happens when a specific action occurs. Steps are an ordered list of entity IDs with optional labels describing what happens at each step.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        name: {
+          type: 'string' as const,
+          description: 'Short name for the flow (e.g., "Fact write lifecycle", "Map render pipeline")',
+        },
+        description: {
+          type: 'string' as const,
+          description: 'What this flow represents — when does it happen, what triggers it',
+        },
+        steps: {
+          type: 'array' as const,
+          items: {
+            type: 'object' as const,
+            properties: {
+              entityId: {
+                type: 'string' as const,
+                description: 'Entity ID for this step (e.g., "actor:MCP stdio")',
+              },
+              label: {
+                type: 'string' as const,
+                description: 'What happens at this step (e.g., "receives tool call", "persists to disk")',
+              },
+            },
+            required: ['entityId'],
+          },
+          description: 'Ordered steps through the system',
+        },
+        evidence: evidenceSchema,
+      },
+      required: ['name', 'steps', 'evidence'],
+    },
+  },
+  {
+    name: 'cartographer_get_entity',
+    description:
+      'Get full details for an entity including all relationships and evidence.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        id: {
+          type: 'string' as const,
+          description: 'Entity ID (e.g., "boundary:auth", "capability:createOrder")',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'cartographer_get_summary',
+    description: 'Get current world-model statistics: entity/relationship counts, confidence distribution.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
+    name: 'cartographer_open_map',
+    description: 'Open the Cartographer browser UI to view the current map projection.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        focus: {
+          type: 'string' as const,
+          description: 'Optional entity ID to focus on',
+        },
+      },
+    },
+  },
+  {
+    name: 'cartographer_clear',
+    description: 'Reset the world-model. Destructive — removes all entities and relationships.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        confirm: {
+          type: 'boolean' as const,
+          description: 'Must be true to confirm deletion',
+        },
+      },
+      required: ['confirm'],
+    },
+  },
+];
+
+// ─── Register Tools ────────────────────────────────────────────
+
+export function registerTools(server: Server, store: WorldModelStore, port: number): void {
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: TOOLS,
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+
+    switch (name) {
+      case 'cartographer_write_entity': {
+        const { kind, name: entityName, description, evidence, parentBoundary, metadata } =
+          args as {
+            kind: EntityKind;
+            name: string;
+            description?: string;
+            evidence: {
+              anchors: SourceAnchor[];
+              confidence: Confidence;
+              provenance: Provenance;
+              reasoning?: string;
+              supportingFacts?: string[];
+            };
+            parentBoundary?: string;
+            metadata?: Record<string, unknown>;
+          };
+
+        const result = store.writeEntity({
+          kind,
+          name: entityName,
+          description,
+          evidence: {
+            anchors: evidence.anchors ?? [],
+            confidence: evidence.confidence,
+            provenance: evidence.provenance,
+            reasoning: evidence.reasoning,
+            tool: 'agent',
+            supportingFacts: evidence.supportingFacts,
+          },
+          parentBoundary,
+          metadata,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(result),
+            },
+          ],
+        };
+      }
+
+      case 'cartographer_write_relationship': {
+        const { kind, source, target, description, evidence } =
+          args as {
+            kind: RelationshipKind;
+            source: string;
+            target: string;
+            description?: string;
+            evidence: {
+              anchors: SourceAnchor[];
+              confidence: Confidence;
+              provenance: Provenance;
+              reasoning?: string;
+              supportingFacts?: string[];
+            };
+          };
+
+        const result = store.writeRelationship({
+          kind,
+          source,
+          target,
+          description,
+          evidence: {
+            anchors: evidence.anchors ?? [],
+            confidence: evidence.confidence,
+            provenance: evidence.provenance,
+            reasoning: evidence.reasoning,
+            tool: 'agent',
+            supportingFacts: evidence.supportingFacts,
+          },
+        });
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+        };
+      }
+
+      case 'cartographer_query': {
+        const { entityKind, relationshipKind, involves, namePattern, minConfidence, limit } =
+          args as {
+            entityKind?: EntityKind;
+            relationshipKind?: RelationshipKind;
+            involves?: string;
+            namePattern?: string;
+            minConfidence?: Confidence;
+            limit?: number;
+          };
+
+        const entities = store.queryEntities({
+          kind: entityKind,
+          namePattern,
+          involves,
+          minConfidence,
+          limit,
+        });
+
+        const relationships = store.queryRelationships({
+          kind: relationshipKind,
+          involves,
+          minConfidence,
+          limit,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                entities,
+                relationships,
+                totalEntities: entities.length,
+                totalRelationships: relationships.length,
+              }),
+            },
+          ],
+        };
+      }
+
+      case 'cartographer_write_slice': {
+        const { name: sliceName, description, steps, evidence } =
+          args as {
+            name: string;
+            description?: string;
+            steps: { entityId: string; label?: string }[];
+            evidence: {
+              anchors: SourceAnchor[];
+              confidence: Confidence;
+              provenance: Provenance;
+              reasoning?: string;
+              supportingFacts?: string[];
+            };
+          };
+
+        const result = store.writeSlice({
+          name: sliceName,
+          description,
+          steps,
+          evidence: {
+            anchors: evidence.anchors ?? [],
+            confidence: evidence.confidence,
+            provenance: evidence.provenance,
+            reasoning: evidence.reasoning,
+            tool: 'agent',
+            supportingFacts: evidence.supportingFacts,
+          },
+        });
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+        };
+      }
+
+      case 'cartographer_get_entity': {
+        const { id } = args as { id: string };
+        const details = store.getEntityDetails(id);
+        if (!details) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: `Entity not found: ${id}` }) }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(details) }],
+        };
+      }
+
+      case 'cartographer_get_summary': {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(store.getSummary()) }],
+        };
+      }
+
+      case 'cartographer_open_map': {
+        const { focus } = (args ?? {}) as { focus?: string };
+        const url = focus
+          ? `http://localhost:${port}?focus=${encodeURIComponent(focus)}`
+          : `http://localhost:${port}`;
+
+        // Open browser safely using execFile (no shell injection)
+        const cmd = process.platform === 'darwin'
+          ? 'open'
+          : process.platform === 'win32'
+            ? 'cmd'
+            : 'xdg-open';
+        const cmdArgs = process.platform === 'win32' ? ['/c', 'start', url] : [url];
+        execFile(cmd, cmdArgs, (err) => {
+          if (err) console.error('[cartographer] Failed to open browser:', err.message);
+        });
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ url, message: 'Map opened in browser' }),
+            },
+          ],
+        };
+      }
+
+      case 'cartographer_clear': {
+        const { confirm } = args as { confirm: boolean };
+        if (!confirm) {
+          return {
+            content: [
+              { type: 'text' as const, text: JSON.stringify({ error: 'Must set confirm: true' }) },
+            ],
+            isError: true,
+          };
+        }
+        store.clear();
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ cleared: true }) }],
+        };
+      }
+
+      default:
+        return {
+          content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+          isError: true,
+        };
+    }
+  });
+}

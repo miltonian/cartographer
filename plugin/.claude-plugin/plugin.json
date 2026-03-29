@@ -1,0 +1,5 @@
+{
+  "name": "cartographer",
+  "version": "0.1.0",
+  "description": "Agent-first code understanding system. Builds a persistent world-model of your codebase with evidence-grounded facts, visual map projections, and inspectable source anchors."
+}
