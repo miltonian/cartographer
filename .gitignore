@@ -1,4 +1,6 @@
 node_modules/
-dist/
+dist/index.*
+dist/index/
 .cartographer/
 *.tsbuildinfo
+# dist/ui/ is tracked — ships with the plugin so the browser UI works on marketplace install
