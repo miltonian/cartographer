@@ -12,7 +12,7 @@
     {
       "name": "cartographer",
       "source": "./plugin",
-      "description": "Cartographer: semantic map, evidence-grounded world-model, behavior flow tracing. Uses Claude Code as the agent, a local service as the backbone, and a browser UI for visualization."
+      "description": "Cartographer: semantic map, evidence-grounded world-model, behavior flows, perspectives, PR review overlay, and navigable semantic zoom. Uses Claude Code as the agent, a local service as the backbone, and a browser UI for visualization."
     }
   ]
 }

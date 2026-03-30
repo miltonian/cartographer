@@ -1,7 +1,7 @@
 {
   "name": "cartographer",
   "version": "0.2.0",
-  "description": "Agent-first code understanding system. Builds a persistent world-model of your codebase with evidence-grounded facts, visual map projections, and inspectable source anchors.",
+  "description": "Agent-first code understanding system. Builds a persistent world-model of your codebase with evidence-grounded facts, semantic map, behavior flows, perspectives, PR review overlay, and navigable depth via semantic zoom.",
   "author": {
     "name": "Alexander Hamilton",
     "email": "miltonian@users.noreply.github.com"
