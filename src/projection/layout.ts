@@ -114,11 +114,22 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
   const allBoundaries = visibleEntities.filter((e) => e.kind === 'boundary');
   const nonBoundaries = visibleEntities.filter((e) => e.kind !== 'boundary');
 
+  // When inside a boundary-derived perspective, don't group children under
+  // their parent — they ARE the world now. The parent is the context (breadcrumb),
+  // not a container on the map.
+  const isBoundaryPerspective = !isDefault && activePerspective?.source === 'boundary';
+  const parentBoundaryId = isBoundaryPerspective
+    ? entities.find((e) => e.kind === 'boundary' && `perspective:${e.name}` === activePerspectiveId)?.id
+    : null;
+
   // Group children by parent boundary
   const childrenOf = new Map<string, WorldEntity[]>();
   const orphans: WorldEntity[] = [];
   for (const e of nonBoundaries) {
-    if (e.parentBoundary && visibleIds.has(e.parentBoundary)) {
+    // If we're inside a boundary perspective, treat direct children as top-level
+    if (isBoundaryPerspective && e.parentBoundary === parentBoundaryId) {
+      orphans.push(e);
+    } else if (e.parentBoundary && visibleIds.has(e.parentBoundary)) {
       const list = childrenOf.get(e.parentBoundary) ?? [];
       list.push(e);
       childrenOf.set(e.parentBoundary, list);
@@ -141,6 +152,7 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
   for (const children of childrenOf.values()) {
     children.sort((a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9));
   }
+  orphans.sort((a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9));
 
   const mapNodes: MapNode[] = [];
 
@@ -215,12 +227,14 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
     });
   }
 
-  // Orphan nodes (no parent boundary) — placed below all groups
+  // Orphan nodes — when inside a boundary perspective these are the primary
+  // content, so use wider layout. Otherwise placed below groups.
   if (orphans.length > 0) {
-    const orphanY = curY + rowMaxH + GROUP_GAP * 2;
+    const orphanCols = isBoundaryPerspective ? 4 : COLS;
+    const orphanY = boundaries.length > 0 ? curY + rowMaxH + GROUP_GAP * 2 : 0;
     orphans.forEach((o, i) => {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
+      const col = i % orphanCols;
+      const row = Math.floor(i / orphanCols);
       mapNodes.push({
         id: o.id,
         kind: o.kind,
