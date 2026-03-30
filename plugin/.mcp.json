@@ -2,10 +2,7 @@
   "mcpServers": {
     "cartographer": {
       "command": "sh",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/start.sh"],
-      "env": {
-        "CARTOGRAPHER_DATA": "${CLAUDE_PLUGIN_DATA}"
-      }
+      "args": ["${CLAUDE_PLUGIN_ROOT}/start.sh"]
     }
   }
 }
