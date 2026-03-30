@@ -8,6 +8,7 @@ import {
   ENTITY_KINDS,
   RELATIONSHIP_KINDS,
   CONFIDENCE_LEVELS,
+  CONFIDENCE_RANK,
   PROVENANCE_KINDS,
   type EntityKind,
   type RelationshipKind,
@@ -448,13 +449,36 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
           limit,
         });
 
+        // Return lightweight summaries — use get_entity for full details
+        const entitySummaries = entities.map((e) => ({
+          id: e.id,
+          kind: e.kind,
+          name: e.name,
+          description: e.description,
+          parentBoundary: e.parentBoundary,
+          evidenceCount: e.evidence.length,
+          bestConfidence: e.evidence.length > 0
+            ? e.evidence.reduce((best, ev) =>
+                (CONFIDENCE_RANK[ev.confidence] > CONFIDENCE_RANK[best]) ? ev.confidence : best,
+                'speculative' as Confidence)
+            : 'speculative',
+        }));
+
+        const relSummaries = relationships.map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          source: r.source,
+          target: r.target,
+          description: r.description,
+        }));
+
         return {
           content: [
             {
               type: 'text' as const,
               text: JSON.stringify({
-                entities,
-                relationships,
+                entities: entitySummaries,
+                relationships: relSummaries,
                 totalEntities: entities.length,
                 totalRelationships: relationships.length,
               }),
