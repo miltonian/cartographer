@@ -294,9 +294,11 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       }
     }
 
-    const nameRegex = query.namePattern
-      ? new RegExp(query.namePattern, 'i')
-      : null;
+    let nameRegex: RegExp | null = null;
+    if (query.namePattern) {
+      try { nameRegex = new RegExp(query.namePattern, 'i'); }
+      catch { nameRegex = new RegExp(query.namePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+    }
 
     for (const entity of this.entities.values()) {
       if (results.length >= limit) break;
@@ -595,8 +597,14 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
           if (num >= this.evidenceCounter) this.evidenceCounter = num + 1;
         }
       }
-    } catch {
-      // Corrupted file — start fresh
+    } catch (err) {
+      console.error('[cartographer] WARNING: model.json is corrupted or unreadable. Starting with empty model.', err);
+      // Save the corrupted file for debugging
+      try {
+        const backupPath = this.persistPath + '.corrupted';
+        fs.copyFileSync(this.persistPath, backupPath);
+        console.error(`[cartographer] Corrupted file saved to: ${backupPath}`);
+      } catch { /* best effort */ }
     }
   }
 
