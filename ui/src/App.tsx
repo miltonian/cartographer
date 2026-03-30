@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { CartographerMap } from './components/CartographerMap';
 import { Inspector } from './components/Inspector';
@@ -47,10 +47,16 @@ export function App() {
     { id: null, name: 'Overview' },
   ]);
 
+  // Use a ref so WebSocket-triggered loads always use the latest perspective,
+  // not the stale closure value from when the callback was created.
+  const perspectiveRef = useRef(clientPerspective);
+  perspectiveRef.current = clientPerspective;
+
   const loadData = useCallback(async () => {
     try {
-      const perspParam = clientPerspective
-        ? `?perspective=${encodeURIComponent(clientPerspective)}`
+      const persp = perspectiveRef.current;
+      const perspParam = persp
+        ? `?perspective=${encodeURIComponent(persp)}`
         : '';
       const [proj, sum, sl] = await Promise.all([
         fetch(`/api/projection/map${perspParam}`).then((r) => r.json()),
@@ -63,11 +69,16 @@ export function App() {
     } catch {
       // Service not ready yet
     }
-  }, [clientPerspective]);
+  }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Reload when perspective changes
+  useEffect(() => {
+    loadData();
+  }, [clientPerspective, loadData]);
 
   // WebSocket for live updates
   useEffect(() => {

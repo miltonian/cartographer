@@ -429,7 +429,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     if (!perspective) return null;
     this.activePerspectiveId = id;
     this.markDirty();
-    this.emit('model:cleared'); // Signal UI to refresh with new perspective
+    // Don't emit model:cleared — perspective switching is client-side via URL.
+    // Emitting here causes a race condition where loadData() fires with stale state.
     return perspective;
   }
 
