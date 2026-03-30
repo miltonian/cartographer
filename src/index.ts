@@ -62,9 +62,15 @@ const uiDistPath = scriptDir.endsWith('src')
   ? path.join(scriptDir, '..', 'dist', 'ui')
   : path.join(scriptDir, 'ui');
 if (fs.existsSync(uiDistPath)) {
-  app.use(express.static(uiDistPath));
+  // Assets have hashed filenames — cache forever. HTML must not be cached.
+  app.use('/assets', express.static(path.join(uiDistPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  app.use(express.static(uiDistPath, { maxAge: 0 }));
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/ws')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(uiDistPath, 'index.html'));
     }
   });
