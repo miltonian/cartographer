@@ -141,6 +141,42 @@ Start broad, then go deep where it matters:
 Don't try to record every function. Focus on the ones that matter for understanding
 the system's behavior and structure.
 
+## Going Deeper (Increasing Resolution)
+
+When the user asks to "go deeper" on a specific entity or area, increase the
+resolution by creating sub-structure inside it.
+
+For example, if the user says "go deeper on WorldModelStore":
+
+1. Read the source code for WorldModelStore more carefully
+2. Create a sub-boundary for its internals:
+   ```
+   cartographer_write_entity(
+     kind: "boundary",
+     name: "WorldModelStore internals",
+     description: "Internal structure of the WorldModelStore class",
+     parentBoundary: "boundary:service",
+     evidence: { ... }
+   )
+   ```
+3. Record its internal capabilities as children of that boundary:
+   ```
+   cartographer_write_entity(
+     kind: "capability",
+     name: "writeEntity",
+     parentBoundary: "boundary:WorldModelStore internals",
+     ...
+   )
+   ```
+4. Record internal relationships, invariants, failure points
+
+The sub-boundary will appear on the map as a clickable container. The user
+can click into it (semantic zoom) to see the internal structure, and use
+the breadcrumb to navigate back.
+
+This works recursively — any boundary can contain sub-boundaries. The depth
+is limited only by how far the user wants to go.
+
 ## Trace Behavior Flows
 
 After recording entities and relationships, trace the key storylines through the system.
