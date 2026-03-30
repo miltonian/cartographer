@@ -87,25 +87,40 @@ export function createRouter(store: WorldModelStore): Router {
 
   // ─── Map Projection ──────────────────────────────────────
 
-  let cachedProjection: MapProjection | null = null;
-  let projectionDirty = true;
+  const projectionCache = new Map<string, MapProjection>();
+  let projectionsDirty = true;
 
-  store.on('entity:added', () => { projectionDirty = true; });
-  store.on('entity:updated', () => { projectionDirty = true; });
-  store.on('relationship:added', () => { projectionDirty = true; });
-  store.on('relationship:updated', () => { projectionDirty = true; });
+  store.on('entity:added', () => { projectionsDirty = true; });
+  store.on('entity:updated', () => { projectionsDirty = true; });
+  store.on('relationship:added', () => { projectionsDirty = true; });
+  store.on('relationship:updated', () => { projectionsDirty = true; });
   store.on('model:cleared', () => {
-    projectionDirty = true;
-    cachedProjection = null;
+    projectionsDirty = true;
+    projectionCache.clear();
   });
 
-  router.get('/projection/map', (_req: Request, res: Response) => {
-    if (projectionDirty || !cachedProjection) {
-      const snapshot = store.getSnapshot();
-      cachedProjection = computeMapProjection(snapshot);
-      projectionDirty = false;
+  router.get('/projection/map', (req: Request, res: Response) => {
+    // Accept ?perspective=perspective:auth to render a specific perspective
+    // without changing the server's active perspective
+    const perspectiveId = (req.query.perspective as string | undefined) ?? undefined;
+    const cacheKey = perspectiveId ?? '__active__';
+
+    if (projectionsDirty) {
+      projectionCache.clear();
+      projectionsDirty = false;
     }
-    res.json(cachedProjection);
+
+    let projection = projectionCache.get(cacheKey);
+    if (!projection) {
+      const snapshot = store.getSnapshot();
+      // Temporarily override activePerspectiveId if a specific perspective is requested
+      if (perspectiveId) {
+        snapshot.activePerspectiveId = perspectiveId;
+      }
+      projection = computeMapProjection(snapshot);
+      projectionCache.set(cacheKey, projection);
+    }
+    res.json(projection);
   });
 
   return router;

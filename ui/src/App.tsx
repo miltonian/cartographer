@@ -17,6 +17,21 @@ import {
 } from './lib/api';
 import { connectWebSocket } from './lib/ws';
 
+function getPerspectiveFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('perspective');
+}
+
+function setPerspectiveInUrl(perspectiveId: string | null) {
+  const url = new URL(window.location.href);
+  if (perspectiveId && perspectiveId !== 'perspective:default') {
+    url.searchParams.set('perspective', perspectiveId);
+  } else {
+    url.searchParams.delete('perspective');
+  }
+  window.history.replaceState({}, '', url.toString());
+}
+
 export function App() {
   const [projection, setProjection] = useState<MapProjection | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<EntityDetails | null>(null);
@@ -24,11 +39,17 @@ export function App() {
   const [slices, setSlices] = useState<BehaviorSlice[]>([]);
   const [activeSliceId, setActiveSliceId] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [clientPerspective, setClientPerspective] = useState<string | null>(
+    getPerspectiveFromUrl,
+  );
 
   const loadData = useCallback(async () => {
     try {
+      const perspParam = clientPerspective
+        ? `?perspective=${encodeURIComponent(clientPerspective)}`
+        : '';
       const [proj, sum, sl] = await Promise.all([
-        fetchProjection(),
+        fetch(`/api/projection/map${perspParam}`).then((r) => r.json()),
         fetchSummary(),
         fetchSlices(),
       ]);
@@ -38,7 +59,7 @@ export function App() {
     } catch {
       // Service not ready yet
     }
-  }, []);
+  }, [clientPerspective]);
 
   useEffect(() => {
     loadData();
@@ -116,15 +137,11 @@ export function App() {
         {projection && projection.perspectives.length > 1 && (
           <PerspectiveSelector
             perspectives={projection.perspectives}
-            activePerspective={projection.activePerspective}
-            onSwitch={async (id) => {
-              // Switch perspective via API, then reload
-              await fetch(`/api/perspective/switch`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id }),
-              });
-              loadData();
+            activePerspective={clientPerspective ?? projection.activePerspective}
+            onSwitch={(id) => {
+              const isDefault = id === 'perspective:default';
+              setClientPerspective(isDefault ? null : id);
+              setPerspectiveInUrl(isDefault ? null : id);
             }}
           />
         )}
