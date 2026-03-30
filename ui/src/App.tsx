@@ -71,6 +71,7 @@ export function App() {
     }
   }, []);
 
+  // Load on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -80,7 +81,10 @@ export function App() {
     loadData();
   }, [clientPerspective, loadData]);
 
-  // WebSocket for live updates
+  // WebSocket for live updates — connect ONCE, use ref to call latest loadData
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+
   useEffect(() => {
     const ws = connectWebSocket((message) => {
       setConnected(true);
@@ -94,7 +98,7 @@ export function App() {
         message.type === 'model:cleared' ||
         message.type === 'snapshot'
       ) {
-        loadData();
+        loadDataRef.current();
       }
     });
 
@@ -102,7 +106,7 @@ export function App() {
     ws.addEventListener('close', () => setConnected(false));
 
     return () => ws.close();
-  }, [loadData]);
+  }, []);
 
   const handleNodeClick = useCallback(async (entityId: string) => {
     try {
