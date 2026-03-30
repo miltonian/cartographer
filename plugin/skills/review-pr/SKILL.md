@@ -1,8 +1,9 @@
 ---
 name: review-pr
-description: Visualize a pull request on the Cartographer map — see which entities are affected, the blast radius, and the review path
+description: Visualize a pull request on the Cartographer map — see which entities are affected, the blast radius, and the review path. Use when user says "review pr", "review pull request", or "/cartographer review-pr".
 model: opus
 effort: high
+argument-hint: "[PR number or branch name]"
 ---
 
 # PR Review on Cartographer Map
