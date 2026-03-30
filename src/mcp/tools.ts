@@ -287,6 +287,41 @@ const TOOLS = [
     },
   },
   {
+    name: 'cartographer_snapshot',
+    description: 'Save a snapshot of the current world-model. Use before risky operations.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        label: {
+          type: 'string' as const,
+          description: 'Optional label for this snapshot (e.g., "before-refactor")',
+        },
+      },
+    },
+  },
+  {
+    name: 'cartographer_list_snapshots',
+    description: 'List available snapshots that can be restored.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
+    name: 'cartographer_restore',
+    description: 'Restore the world-model from a snapshot. Saves current state before restoring.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        filename: {
+          type: 'string' as const,
+          description: 'Snapshot filename from cartographer_list_snapshots',
+        },
+      },
+      required: ['filename'],
+    },
+  },
+  {
     name: 'cartographer_get_summary',
     description: 'Get current world-model statistics: entity/relationship counts, confidence distribution.',
     inputSchema: {
@@ -623,6 +658,34 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
               }),
             },
           ],
+        };
+      }
+
+      case 'cartographer_snapshot': {
+        const { label } = (args ?? {}) as { label?: string };
+        const filename = store.saveSnapshot(label);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ saved: filename }) }],
+        };
+      }
+
+      case 'cartographer_list_snapshots': {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ snapshots: store.listSnapshots() }) }],
+        };
+      }
+
+      case 'cartographer_restore': {
+        const { filename } = args as { filename: string };
+        const restored = store.restoreSnapshot(filename);
+        if (!restored) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: `Snapshot not found: ${filename}` }) }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ restored: filename }) }],
         };
       }
 

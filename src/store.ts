@@ -372,6 +372,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   // ─── Model Management ─────────────────────────────────────
 
   setProject(rootPath: string): void {
+    if (this.entities.size > 0) this.saveSnapshot('pre-switch');
     this.persistToDisk();
     this.entities.clear();
     this.relationships.clear();
@@ -528,6 +529,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   }
 
   clear(): void {
+    if (this.entities.size > 0) this.saveSnapshot('pre-clear');
     this.entities.clear();
     this.relationships.clear();
     this.slices.clear();
@@ -612,6 +614,63 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     }
     const snapshot = this.getSnapshot();
     fs.writeFileSync(this.persistPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+  }
+
+  // ─── Snapshots ─────────────────────────────────────────────
+
+  private get snapshotDir(): string {
+    return path.join(path.dirname(this.persistPath), 'snapshots');
+  }
+
+  saveSnapshot(label?: string): string {
+    if (!fs.existsSync(this.persistPath)) return '';
+    fs.mkdirSync(this.snapshotDir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const suffix = label ? `-${label.replace(/[^a-zA-Z0-9-]/g, '_')}` : '';
+    const filename = `model.${ts}${suffix}.json`;
+    const dest = path.join(this.snapshotDir, filename);
+    fs.copyFileSync(this.persistPath, dest);
+    this.pruneSnapshots(10);
+    return filename;
+  }
+
+  listSnapshots(): { filename: string; size: number; created: string }[] {
+    if (!fs.existsSync(this.snapshotDir)) return [];
+    return fs.readdirSync(this.snapshotDir)
+      .filter((f) => f.startsWith('model.') && f.endsWith('.json'))
+      .sort()
+      .reverse()
+      .map((f) => {
+        const stat = fs.statSync(path.join(this.snapshotDir, f));
+        return { filename: f, size: stat.size, created: stat.mtime.toISOString() };
+      });
+  }
+
+  restoreSnapshot(filename: string): boolean {
+    const src = path.join(this.snapshotDir, filename);
+    if (!fs.existsSync(src)) return false;
+    // Save current state as a snapshot before restoring
+    this.saveSnapshot('pre-restore');
+    // Replace current model
+    fs.copyFileSync(src, this.persistPath);
+    // Reload
+    this.entities.clear();
+    this.relationships.clear();
+    this.slices.clear();
+    this.perspectives.clear();
+    this.evidenceCounter = 0;
+    this.ensureDefaultPerspective();
+    this.loadFromDisk();
+    this.emit('model:cleared');
+    return true;
+  }
+
+  private pruneSnapshots(keep: number): void {
+    const snapshots = this.listSnapshots();
+    if (snapshots.length <= keep) return;
+    for (const s of snapshots.slice(keep)) {
+      fs.unlinkSync(path.join(this.snapshotDir, s.filename));
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────

@@ -50,6 +50,21 @@ Visualize a PR on the Cartographer map.
 Invoke the `review-pr` skill with the PR identifier as the argument.
 Shows which entities are affected, the blast radius, and a review path.
 
+### snapshot [label]
+Save a snapshot of the current world-model.
+
+Call `cartographer_snapshot` with an optional label.
+
+### snapshots
+List available snapshots.
+
+Call `cartographer_list_snapshots`.
+
+### restore <filename>
+Restore the world-model from a snapshot.
+
+Call `cartographer_restore` with the filename.
+
 ### query <pattern>
 Search the world-model for entities matching the pattern.
 
