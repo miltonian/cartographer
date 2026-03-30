@@ -75,6 +75,20 @@ export function createRouter(store: WorldModelStore): Router {
     });
   });
 
+  router.post('/perspective/from-boundary', (req: Request, res: Response) => {
+    const { boundaryId } = req.body as { boundaryId: string };
+    const perspective = store.createPerspectiveFromBoundary(boundaryId);
+    if (!perspective) {
+      res.status(404).json({ error: `Boundary not found or empty: ${boundaryId}` });
+      return;
+    }
+    res.json({
+      perspectiveId: perspective.id,
+      name: perspective.name,
+      entityCount: perspective.entityIds.length,
+    });
+  });
+
   router.post('/perspective/switch', (req: Request, res: Response) => {
     const { id } = req.body as { id: string };
     const perspective = store.switchPerspective(id);

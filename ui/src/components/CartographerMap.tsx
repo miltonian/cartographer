@@ -163,9 +163,10 @@ interface Props {
   selectedEntityId: string | null;
   activeFlowEntityIds: Set<string> | null;
   onNodeClick: (entityId: string) => void;
+  onBoundaryClick: (boundaryId: string) => void;
 }
 
-export function CartographerMap({ projection, selectedEntityId, activeFlowEntityIds, onNodeClick }: Props) {
+export function CartographerMap({ projection, selectedEntityId, activeFlowEntityIds, onNodeClick, onBoundaryClick }: Props) {
   // Build a step-number map from the active flow
   const activeFlowStepMap = useMemo(
     () =>
@@ -194,8 +195,14 @@ export function CartographerMap({ projection, selectedEntityId, activeFlowEntity
   }, [selectedEntityId, activeFlowEntityIds, projection, setNodes, setEdges, activeFlowStepMap]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
-    (_, node) => onNodeClick(node.id),
-    [onNodeClick],
+    (_, node) => {
+      if (node.type === 'boundary') {
+        onBoundaryClick(node.id);
+      } else {
+        onNodeClick(node.id);
+      }
+    },
+    [onNodeClick, onBoundaryClick],
   );
 
   return (

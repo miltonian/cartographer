@@ -5,11 +5,12 @@ import { Inspector } from './components/Inspector';
 import { StatusBar } from './components/StatusBar';
 import { FlowPanel } from './components/FlowPanel';
 import { PerspectiveSelector } from './components/PerspectiveSelector';
+import { Breadcrumb, type BreadcrumbSegment } from './components/Breadcrumb';
 import {
-  fetchProjection,
   fetchEntityDetails,
   fetchSummary,
   fetchSlices,
+  createPerspectiveFromBoundary,
   type MapProjection,
   type EntityDetails,
   type ModelSummary,
@@ -42,6 +43,9 @@ export function App() {
   const [clientPerspective, setClientPerspective] = useState<string | null>(
     getPerspectiveFromUrl,
   );
+  const [navPath, setNavPath] = useState<BreadcrumbSegment[]>([
+    { id: null, name: 'Overview' },
+  ]);
 
   const loadData = useCallback(async () => {
     try {
@@ -98,11 +102,40 @@ export function App() {
     }
   }, []);
 
+  const handleBoundaryClick = useCallback(async (boundaryId: string) => {
+    try {
+      const result = await createPerspectiveFromBoundary(boundaryId);
+      const perspId = result.perspectiveId;
+      setClientPerspective(perspId);
+      setPerspectiveInUrl(perspId);
+      setNavPath((prev) => [...prev, { id: perspId, name: result.name }]);
+    } catch {
+      // Boundary might not have children
+    }
+  }, []);
+
+  const handleBreadcrumbNavigate = useCallback((perspectiveId: string | null) => {
+    setClientPerspective(perspectiveId);
+    setPerspectiveInUrl(perspectiveId);
+    // Pop the nav path back to this level
+    setNavPath((prev) => {
+      const idx = prev.findIndex((s) => s.id === perspectiveId);
+      return idx >= 0 ? prev.slice(0, idx + 1) : [{ id: null, name: 'Overview' }];
+    });
+  }, []);
+
+  const handlePerspectiveSwitch = useCallback((id: string) => {
+    const isDefault = id === 'perspective:default';
+    setClientPerspective(isDefault ? null : id);
+    setPerspectiveInUrl(isDefault ? null : id);
+    // Reset nav path when switching perspectives via tabs
+    setNavPath([{ id: isDefault ? null : id, name: isDefault ? 'Overview' : id.replace('perspective:', '') }]);
+  }, []);
+
   const handleCloseInspector = useCallback(() => {
     setSelectedEntity(null);
   }, []);
 
-  // Compute the set of entity IDs on the active flow path
   const activeFlowEntityIds = useMemo(
     () =>
       activeSliceId
@@ -130,19 +163,17 @@ export function App() {
               selectedEntityId={selectedEntity?.entity.id ?? null}
               activeFlowEntityIds={activeFlowEntityIds}
               onNodeClick={handleNodeClick}
+              onBoundaryClick={handleBoundaryClick}
             />
           </ReactFlowProvider>
         )}
         <StatusBar connected={connected} summary={summary} />
+        <Breadcrumb path={navPath} onNavigate={handleBreadcrumbNavigate} />
         {projection && projection.perspectives.length > 1 && (
           <PerspectiveSelector
             perspectives={projection.perspectives}
             activePerspective={clientPerspective ?? projection.activePerspective}
-            onSwitch={(id) => {
-              const isDefault = id === 'perspective:default';
-              setClientPerspective(isDefault ? null : id);
-              setPerspectiveInUrl(isDefault ? null : id);
-            }}
+            onSwitch={handlePerspectiveSwitch}
           />
         )}
         {slices.length > 0 && (

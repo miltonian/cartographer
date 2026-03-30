@@ -463,6 +463,47 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     return true;
   }
 
+  createPerspectiveFromBoundary(boundaryId: string): Perspective | null {
+    const boundary = this.entities.get(boundaryId);
+    if (!boundary || boundary.kind !== 'boundary') return null;
+
+    const id = `perspective:${boundary.name}`;
+    const existing = this.perspectives.get(id);
+    if (existing && !existing.isDefault) return existing;
+
+    const childIds: string[] = [];
+    for (const e of this.entities.values()) {
+      if (e.parentBoundary === boundaryId) {
+        childIds.push(e.id);
+      }
+    }
+    if (childIds.length === 0) return null;
+
+    // Find slices where at least half the steps involve children of this boundary
+    const childSet = new Set(childIds);
+    const relevantSliceIds: string[] = [];
+    for (const s of this.slices.values()) {
+      const hits = s.steps.filter((step) => childSet.has(step.entityId)).length;
+      if (hits >= Math.ceil(s.steps.length / 2)) {
+        relevantSliceIds.push(s.id);
+      }
+    }
+
+    const now = new Date().toISOString();
+    const perspective: Perspective = {
+      id,
+      name: boundary.name,
+      description: `Inside boundary: ${boundary.name}`,
+      entityIds: childIds,
+      sliceIds: relevantSliceIds,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.perspectives.set(id, perspective);
+    this.markDirty();
+    return perspective;
+  }
+
   private addEntityToActivePerspective(entityId: string): void {
     const perspective = this.perspectives.get(this.activePerspectiveId);
     if (!perspective || perspective.isDefault) return;

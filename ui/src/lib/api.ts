@@ -136,6 +136,17 @@ export async function fetchSlices(): Promise<BehaviorSlice[]> {
   return data.slices;
 }
 
+export async function createPerspectiveFromBoundary(
+  boundaryId: string,
+): Promise<{ perspectiveId: string; name: string; entityCount: number }> {
+  const res = await fetch(`${BASE}/perspective/from-boundary`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ boundaryId }),
+  });
+  return res.json();
+}
+
 export async function fetchSummary(): Promise<ModelSummary> {
   const res = await fetch(`${BASE}/summary`);
   return res.json();
