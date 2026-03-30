@@ -18,6 +18,15 @@ import {
 } from '../ontology.js';
 import { execFile } from 'child_process';
 import * as fs from 'fs';
+
+// MCP transport may deliver arrays/objects as JSON strings instead of parsed values.
+// This safely parses them at runtime.
+function ensureParsed<T>(value: T | string): T {
+  if (typeof value === 'string') {
+    try { return JSON.parse(value) as T; } catch { return value as unknown as T; }
+  }
+  return value;
+}
 import * as path from 'path';
 
 // ─── Schema Fragments ──────────────────────────────────────────
@@ -394,13 +403,13 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             metadata?: Record<string, unknown>;
           };
 
-        const ev = evidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
+        const ev = ensureParsed(evidence) ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
         const result = store.writeEntity({
           kind,
           name: entityName,
           description,
           evidence: {
-            anchors: ev.anchors ?? [],
+            anchors: ensureParsed(ev.anchors) ?? [],
             confidence: ev.confidence ?? 'speculative',
             provenance: ev.provenance ?? 'inferred',
             reasoning: ev.reasoning,
@@ -437,14 +446,14 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             };
           };
 
-        const ev2 = evidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
+        const ev2 = ensureParsed(evidence) ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
         const result = store.writeRelationship({
           kind,
           source,
           target,
           description,
           evidence: {
-            anchors: ev2.anchors ?? [],
+            anchors: ensureParsed(ev2.anchors) ?? [],
             confidence: ev2.confidence ?? 'speculative',
             provenance: ev2.provenance ?? 'inferred',
             reasoning: ev2.reasoning,
@@ -538,18 +547,20 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             };
           };
 
-        const ev3 = evidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
+        const parsedSteps = ensureParsed(steps);
+        const parsedEvidence = ensureParsed(evidence);
+        const ev3 = parsedEvidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
         const result = store.writeSlice({
           name: sliceName,
           description,
           kind,
-          steps: steps.map((s) => ({
+          steps: (Array.isArray(parsedSteps) ? parsedSteps : []).map((s) => ({
             entityId: s.entityId,
             label: s.label,
             changeType: s.changeType as import('../ontology.js').ChangeType | undefined,
           })),
           evidence: {
-            anchors: ev3.anchors ?? [],
+            anchors: ensureParsed(ev3.anchors) ?? [],
             confidence: ev3.confidence ?? 'speculative',
             provenance: ev3.provenance ?? 'inferred',
             reasoning: ev3.reasoning,
