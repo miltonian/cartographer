@@ -7,9 +7,9 @@ interface Props {
 }
 
 export function PerspectiveSelector({ perspectives, activePerspective, onSwitch }: Props) {
-  // Only show default + agent-created perspectives. Boundary perspectives
-  // are accessed via semantic zoom (clicking boundaries), not tabs.
-  const visible = perspectives.filter((p) => p.isDefault || p.source === 'agent');
+  // Hide boundary-derived perspectives — those are accessed via semantic zoom.
+  // Show everything else: default, agent-created, and legacy (no source field).
+  const visible = perspectives.filter((p) => p.source !== 'boundary');
   if (visible.length <= 1) return null;
 
   return (
