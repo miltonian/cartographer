@@ -234,6 +234,48 @@ const TOOLS = [
     },
   },
   {
+    name: 'cartographer_create_perspective',
+    description:
+      'Create a named perspective (lens) over the shared entity pool. Use for focused analysis of a specific concern — e.g., "auth", "data-pipeline", "checkout-flow". Entities written while this perspective is active will auto-join it.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        name: {
+          type: 'string' as const,
+          description: 'Perspective name (e.g., "auth", "data-pipeline", "checkout-flow")',
+        },
+        description: {
+          type: 'string' as const,
+          description: 'What this perspective focuses on',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'cartographer_switch_perspective',
+    description:
+      'Switch the active perspective. Entities and slices written after this call will auto-join the new active perspective. Use "default" to switch back to the full overview.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        name: {
+          type: 'string' as const,
+          description: 'Perspective name (e.g., "auth") or "default" for the full overview',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'cartographer_list_perspectives',
+    description: 'List all perspectives with their entity and slice counts.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
     name: 'cartographer_get_summary',
     description: 'Get current world-model statistics: entity/relationship counts, confidence distribution.',
     inputSchema: {
@@ -454,6 +496,71 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
         }
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(details) }],
+        };
+      }
+
+      case 'cartographer_create_perspective': {
+        const { name: perspName, description } =
+          args as { name: string; description?: string };
+        const perspective = store.createPerspective({ name: perspName, description });
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                id: perspective.id,
+                name: perspective.name,
+                description: perspective.description,
+              }),
+            },
+          ],
+        };
+      }
+
+      case 'cartographer_switch_perspective': {
+        const { name: perspName } = args as { name: string };
+        const id = `perspective:${perspName}`;
+        const perspective = store.switchPerspective(id);
+        if (!perspective) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify({
+                  error: `Perspective not found: ${perspName}. Use cartographer_list_perspectives to see available perspectives, or cartographer_create_perspective to create one.`,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+        const summary = store.getSummary();
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                switched: perspective.name,
+                entityCount: perspective.isDefault ? summary.entityCount : perspective.entityIds.length,
+                sliceCount: perspective.isDefault ? summary.sliceCount : perspective.sliceIds.length,
+              }),
+            },
+          ],
+        };
+      }
+
+      case 'cartographer_list_perspectives': {
+        const perspectives = store.listPerspectives().map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          entityCount: p.isDefault ? store.getSummary().entityCount : p.entityIds.length,
+          sliceCount: p.isDefault ? store.getSummary().sliceCount : p.sliceIds.length,
+          isDefault: p.isDefault ?? false,
+          isActive: p.id === store.getActivePerspective().id,
+        }));
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ perspectives }) }],
         };
       }
 

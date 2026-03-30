@@ -14,6 +14,9 @@ findings as structured facts.
 ## Available MCP Tools
 
 - `cartographer_set_project` — **Call first.** Sets the project root so the model is stored in the right place.
+- `cartographer_create_perspective` — Create a named perspective (lens) for focused analysis
+- `cartographer_switch_perspective` — Switch the active perspective
+- `cartographer_list_perspectives` — List all perspectives
 - `cartographer_write_entity` — Record an entity (boundary, capability, actor, entity, etc.)
 - `cartographer_write_relationship` — Record a relationship between entities
 - `cartographer_write_slice` — Record a behavior flow (ordered path through entities)
@@ -33,6 +36,21 @@ and loads any existing model for that project.
 ```
 cartographer_set_project(rootPath: "/Users/me/my-project")
 ```
+
+### 0b. Choose Perspective (Optional)
+If the user asked to analyze a specific concern (e.g., "analyze the auth system"),
+create a focused perspective before analyzing:
+
+```
+cartographer_create_perspective(name: "auth", description: "Authentication and authorization subsystem")
+cartographer_switch_perspective(name: "auth")
+```
+
+Entities and slices you write will automatically join this perspective. The map will
+show only auth-related entities (plus ghosted neighbors for context).
+
+If the user asks for a general analysis, stay on the "default" perspective — it
+includes everything.
 
 ### 1. Orient
 Read the project root: README, package.json or equivalent, top-level directory structure.

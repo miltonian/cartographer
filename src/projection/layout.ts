@@ -2,6 +2,7 @@ import {
   type WorldModelSnapshot,
   type WorldEntity,
   type WorldRelationship,
+  type Perspective,
   type EntityKind,
   type Confidence,
   CONFIDENCE_RANK,
@@ -25,6 +26,7 @@ export interface MapNode {
   width?: number;
   height?: number;
   parentId?: string;  // React Flow parent nesting
+  contextual?: boolean; // True for ghost entities (connected but not in perspective)
 }
 
 export interface MapEdge {
@@ -38,6 +40,8 @@ export interface MapEdge {
 export interface MapProjection {
   nodes: MapNode[];
   edges: MapEdge[];
+  activePerspective: string;
+  perspectives: { id: string; name: string; entityCount: number; isDefault?: boolean }[];
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
 }
 
@@ -56,24 +60,64 @@ const COLS = 3;            // Max columns inside a group
 // ─── Layout Computation ────────────────────────────────────────
 
 export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjection {
-  const { entities, relationships } = snapshot;
+  const { entities, relationships, perspectives, activePerspectiveId } = snapshot;
 
-  if (entities.length === 0) {
-    return { nodes: [], edges: [], bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 } };
-  }
+  const perspectiveSummaries = (perspectives ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    entityCount: p.isDefault ? entities.length : p.entityIds.length,
+    isDefault: p.isDefault,
+  }));
+
+  const empty: MapProjection = {
+    nodes: [], edges: [],
+    activePerspective: activePerspectiveId ?? 'perspective:default',
+    perspectives: perspectiveSummaries,
+    bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
+  };
+
+  if (entities.length === 0) return empty;
 
   const entityIndex = new Map<string, WorldEntity>();
   for (const e of entities) entityIndex.set(e.id, e);
 
-  // Separate boundaries from their contents
-  const allBoundaries = entities.filter((e) => e.kind === 'boundary');
-  const nonBoundaries = entities.filter((e) => e.kind !== 'boundary');
+  // ── Perspective filtering ──────────────────────────────────
+  const activePerspective = (perspectives ?? []).find(
+    (p) => p.id === activePerspectiveId,
+  );
+  const isDefault = !activePerspective || activePerspective.isDefault;
+
+  // Focused entity IDs: perspective members, or ALL if default
+  const focusedIds = new Set<string>(
+    isDefault ? entities.map((e) => e.id) : activePerspective!.entityIds,
+  );
+
+  // Contextual entity IDs: connected to focused entities but not focused themselves
+  const contextualIds = new Set<string>();
+  if (!isDefault) {
+    for (const rel of relationships) {
+      if (focusedIds.has(rel.source) && !focusedIds.has(rel.target) && entityIndex.has(rel.target)) {
+        contextualIds.add(rel.target);
+      }
+      if (focusedIds.has(rel.target) && !focusedIds.has(rel.source) && entityIndex.has(rel.source)) {
+        contextualIds.add(rel.source);
+      }
+    }
+  }
+
+  // Visible = focused + contextual
+  const visibleIds = new Set([...focusedIds, ...contextualIds]);
+  const visibleEntities = entities.filter((e) => visibleIds.has(e.id));
+
+  // Separate boundaries from their contents (among visible entities)
+  const allBoundaries = visibleEntities.filter((e) => e.kind === 'boundary');
+  const nonBoundaries = visibleEntities.filter((e) => e.kind !== 'boundary');
 
   // Group children by parent boundary
   const childrenOf = new Map<string, WorldEntity[]>();
   const orphans: WorldEntity[] = [];
   for (const e of nonBoundaries) {
-    if (e.parentBoundary && entityIndex.has(e.parentBoundary)) {
+    if (e.parentBoundary && visibleIds.has(e.parentBoundary)) {
       const list = childrenOf.get(e.parentBoundary) ?? [];
       list.push(e);
       childrenOf.set(e.parentBoundary, list);
@@ -82,7 +126,7 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
     }
   }
 
-  // Only show boundaries that have children — empty ones add noise
+  // Only show boundaries that have children
   const boundaries = allBoundaries.filter(
     (b) => (childrenOf.get(b.id) ?? []).length > 0,
   );
@@ -165,6 +209,7 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
         x: GROUP_PAD_X + col * (NODE_W + NODE_GAP_X),
         y: GROUP_LABEL_H + GROUP_PAD_Y + row * (NODE_H + NODE_GAP_Y),
         parentId: boundary.id,
+        contextual: contextualIds.has(child.id),
       });
     });
   }
@@ -184,6 +229,7 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
         evidenceCount: o.evidence.length,
         x: col * (NODE_W + NODE_GAP_X),
         y: orphanY + row * (NODE_H + NODE_GAP_Y),
+        contextual: contextualIds.has(o.id),
       });
     });
   }
@@ -214,7 +260,13 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
     maxY: Math.max(...allY) + 40,
   };
 
-  return { nodes: mapNodes, edges: mapEdges, bounds };
+  return {
+    nodes: mapNodes,
+    edges: mapEdges,
+    activePerspective: activePerspectiveId ?? 'perspective:default',
+    perspectives: perspectiveSummaries,
+    bounds,
+  };
 }
 
 function bestConfidenceOf(entity: WorldEntity): Confidence {

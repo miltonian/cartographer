@@ -1,8 +1,17 @@
 const BASE = '/api';
 
+export interface PerspectiveSummary {
+  id: string;
+  name: string;
+  entityCount: number;
+  isDefault?: boolean;
+}
+
 export interface MapProjection {
   nodes: MapNode[];
   edges: MapEdge[];
+  activePerspective: string;
+  perspectives: PerspectiveSummary[];
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
 }
 
@@ -20,6 +29,7 @@ export interface MapNode {
   width?: number;
   height?: number;
   parentId?: string;
+  contextual?: boolean;
 }
 
 export interface MapEdge {

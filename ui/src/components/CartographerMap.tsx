@@ -123,6 +123,7 @@ function toFlowNodes(
         dimmed,
         onFlow,
         flowStep,
+        contextual: n.contextual ?? false,
       },
     };
   });

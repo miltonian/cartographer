@@ -33,15 +33,17 @@ interface SemanticNodeData {
   dimmed?: boolean;
   onFlow?: boolean;
   flowStep?: number;
+  contextual?: boolean;
 }
 
 export const SemanticNode = memo(function SemanticNode({
   data,
 }: NodeProps & { data: SemanticNodeData }) {
-  const { label, kind, confidence, color, selected, dimmed, onFlow, flowStep } = data;
+  const { label, kind, confidence, color, selected, dimmed, onFlow, flowStep, contextual } = data;
   const confColor = CONFIDENCE_COLORS[confidence] ?? '#3f3f46';
   const shortKind = KIND_SHORT[kind] ?? kind.slice(0, 3).toUpperCase();
   const isActor = kind === 'actor';
+  const ghostOpacity = contextual ? 0.3 : 1;
 
   return (
     <>
@@ -58,7 +60,7 @@ export const SemanticNode = memo(function SemanticNode({
           display: 'flex',
           alignItems: 'center',
           gap: 0,
-          opacity: dimmed ? 0.25 : 1,
+          opacity: dimmed ? 0.25 : ghostOpacity,
           boxShadow: selected
             ? `0 0 0 1px ${color}60, 0 0 12px ${color}20`
             : onFlow

@@ -66,6 +66,25 @@ export function createRouter(store: WorldModelStore): Router {
     res.json({ slices: store.getSlices() });
   });
 
+  // ─── Perspectives ────────────────────────────────────────
+
+  router.get('/perspectives', (_req: Request, res: Response) => {
+    res.json({
+      perspectives: store.listPerspectives(),
+      active: store.getActivePerspective().id,
+    });
+  });
+
+  router.post('/perspective/switch', (req: Request, res: Response) => {
+    const { id } = req.body as { id: string };
+    const perspective = store.switchPerspective(id);
+    if (!perspective) {
+      res.status(404).json({ error: `Perspective not found: ${id}` });
+      return;
+    }
+    res.json({ switched: perspective.name });
+  });
+
   // ─── Map Projection ──────────────────────────────────────
 
   let cachedProjection: MapProjection | null = null;

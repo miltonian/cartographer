@@ -12,6 +12,7 @@ import {
   type Confidence,
   type BehaviorSlice,
   type SliceStep,
+  type Perspective,
   CONFIDENCE_RANK,
 } from './ontology.js';
 
@@ -60,6 +61,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   private entities = new Map<string, WorldEntity>();
   private relationships = new Map<string, WorldRelationship>();
   private slices = new Map<string, BehaviorSlice>();
+  private perspectives = new Map<string, Perspective>();
+  private activePerspectiveId = 'perspective:default';
   private modelId: string;
   private rootPath: string;
   private persistPath: string;
@@ -77,8 +80,27 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     this.createdAt = new Date().toISOString();
     this.updatedAt = this.createdAt;
 
+    // Ensure the default perspective always exists
+    this.ensureDefaultPerspective();
+
     fs.mkdirSync(resolvedDataDir, { recursive: true });
     this.loadFromDisk();
+  }
+
+  private ensureDefaultPerspective(): void {
+    if (!this.perspectives.has('perspective:default')) {
+      const now = new Date().toISOString();
+      this.perspectives.set('perspective:default', {
+        id: 'perspective:default',
+        name: 'default',
+        description: 'Full system overview — all entities',
+        entityIds: [],
+        sliceIds: [],
+        isDefault: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   }
 
   // ─── Write Operations ──────────────────────────────────────
@@ -109,6 +131,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
         existing.metadata = { ...existing.metadata, ...input.metadata };
       }
       existing.updatedAt = now;
+      this.addEntityToActivePerspective(id);
       this.markDirty();
       this.emit('entity:updated', existing);
       return { id, created: false };
@@ -126,6 +149,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       updatedAt: now,
     };
     this.entities.set(id, entity);
+    this.addEntityToActivePerspective(id);
     this.markDirty();
     this.emit('entity:added', entity);
     return { id, created: true };
@@ -197,6 +221,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       existing.evidence.push(evidenceEntry);
       if (input.description) existing.description = input.description;
       existing.updatedAt = now;
+      this.addSliceToActivePerspective(id);
       this.markDirty();
       this.emit('slice:updated', existing);
       return { id, created: false };
@@ -212,6 +237,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       updatedAt: now,
     };
     this.slices.set(id, slice);
+    this.addSliceToActivePerspective(id);
     this.markDirty();
     this.emit('slice:added', slice);
     return { id, created: true };
@@ -332,6 +358,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       entityCount: this.entities.size,
       relationshipCount: this.relationships.size,
       sliceCount: this.slices.size,
+      perspectiveCount: this.perspectives.size,
+      activePerspective: this.activePerspectiveId,
       entitiesByKind,
       relationshipsByKind,
       confidenceDistribution,
@@ -342,14 +370,13 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   // ─── Model Management ─────────────────────────────────────
 
   setProject(rootPath: string): void {
-    // Persist current model before switching
     this.persistToDisk();
-    // Reset in-memory state
     this.entities.clear();
     this.relationships.clear();
     this.slices.clear();
+    this.perspectives.clear();
+    this.activePerspectiveId = 'perspective:default';
     this.evidenceCounter = 0;
-    // Rebind to new project
     this.rootPath = rootPath;
     const dataDir = path.join(rootPath, '.cartographer');
     fs.mkdirSync(dataDir, { recursive: true });
@@ -357,19 +384,110 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     this.modelId = `model:${path.basename(rootPath)}`;
     this.createdAt = new Date().toISOString();
     this.updatedAt = this.createdAt;
-    // Load existing model for this project if it exists
+    this.ensureDefaultPerspective();
     this.loadFromDisk();
-    this.emit('model:cleared'); // Signal UI to refresh
+    this.emit('model:cleared');
   }
 
   getSlices(): BehaviorSlice[] {
     return Array.from(this.slices.values());
   }
 
+  // ─── Perspective Operations ────────────────────────────────
+
+  createPerspective(input: {
+    name: string;
+    description?: string;
+  }): Perspective {
+    const id = `perspective:${input.name}`;
+    const now = new Date().toISOString();
+    const existing = this.perspectives.get(id);
+    if (existing) {
+      if (input.description) existing.description = input.description;
+      existing.updatedAt = now;
+      this.markDirty();
+      return existing;
+    }
+    const perspective: Perspective = {
+      id,
+      name: input.name,
+      description: input.description,
+      entityIds: [],
+      sliceIds: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.perspectives.set(id, perspective);
+    this.markDirty();
+    return perspective;
+  }
+
+  switchPerspective(id: string): Perspective | null {
+    const perspective = this.perspectives.get(id);
+    if (!perspective) return null;
+    this.activePerspectiveId = id;
+    this.markDirty();
+    this.emit('model:cleared'); // Signal UI to refresh with new perspective
+    return perspective;
+  }
+
+  getActivePerspective(): Perspective {
+    return this.perspectives.get(this.activePerspectiveId)
+      ?? this.perspectives.get('perspective:default')!;
+  }
+
+  listPerspectives(): Perspective[] {
+    return Array.from(this.perspectives.values());
+  }
+
+  addEntityToPerspective(entityId: string, perspectiveId: string): boolean {
+    const perspective = this.perspectives.get(perspectiveId);
+    if (!perspective || perspective.isDefault) return false;
+    if (!perspective.entityIds.includes(entityId)) {
+      perspective.entityIds.push(entityId);
+      perspective.updatedAt = new Date().toISOString();
+      this.markDirty();
+    }
+    return true;
+  }
+
+  removeEntityFromPerspective(entityId: string, perspectiveId: string): boolean {
+    const perspective = this.perspectives.get(perspectiveId);
+    if (!perspective || perspective.isDefault) return false;
+    const idx = perspective.entityIds.indexOf(entityId);
+    if (idx >= 0) {
+      perspective.entityIds.splice(idx, 1);
+      perspective.updatedAt = new Date().toISOString();
+      this.markDirty();
+    }
+    return true;
+  }
+
+  private addEntityToActivePerspective(entityId: string): void {
+    const perspective = this.perspectives.get(this.activePerspectiveId);
+    if (!perspective || perspective.isDefault) return;
+    if (!perspective.entityIds.includes(entityId)) {
+      perspective.entityIds.push(entityId);
+      perspective.updatedAt = new Date().toISOString();
+    }
+  }
+
+  private addSliceToActivePerspective(sliceId: string): void {
+    const perspective = this.perspectives.get(this.activePerspectiveId);
+    if (!perspective || perspective.isDefault) return;
+    if (!perspective.sliceIds.includes(sliceId)) {
+      perspective.sliceIds.push(sliceId);
+      perspective.updatedAt = new Date().toISOString();
+    }
+  }
+
   clear(): void {
     this.entities.clear();
     this.relationships.clear();
     this.slices.clear();
+    this.perspectives.clear();
+    this.activePerspectiveId = 'perspective:default';
+    this.ensureDefaultPerspective();
     this.evidenceCounter = 0;
     this.updatedAt = new Date().toISOString();
     this.markDirty();
@@ -383,6 +501,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       entities: Array.from(this.entities.values()),
       relationships: Array.from(this.relationships.values()),
       slices: Array.from(this.slices.values()),
+      perspectives: Array.from(this.perspectives.values()),
+      activePerspectiveId: this.activePerspectiveId,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -407,6 +527,13 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       for (const s of data.slices ?? []) {
         this.slices.set(s.id, s);
       }
+      for (const p of data.perspectives ?? []) {
+        this.perspectives.set(p.id, p);
+      }
+      if (data.activePerspectiveId) {
+        this.activePerspectiveId = data.activePerspectiveId;
+      }
+      this.ensureDefaultPerspective();
       // Restore evidence counter from existing evidence IDs
       for (const e of data.entities) {
         for (const ev of e.evidence) {

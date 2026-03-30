@@ -4,6 +4,7 @@ import { CartographerMap } from './components/CartographerMap';
 import { Inspector } from './components/Inspector';
 import { StatusBar } from './components/StatusBar';
 import { FlowPanel } from './components/FlowPanel';
+import { PerspectiveSelector } from './components/PerspectiveSelector';
 import {
   fetchProjection,
   fetchEntityDetails,
@@ -112,6 +113,21 @@ export function App() {
           </ReactFlowProvider>
         )}
         <StatusBar connected={connected} summary={summary} />
+        {projection && projection.perspectives.length > 1 && (
+          <PerspectiveSelector
+            perspectives={projection.perspectives}
+            activePerspective={projection.activePerspective}
+            onSwitch={async (id) => {
+              // Switch perspective via API, then reload
+              await fetch(`/api/perspective/switch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+              });
+              loadData();
+            }}
+          />
+        )}
         {slices.length > 0 && (
           <FlowPanel
             slices={slices}
