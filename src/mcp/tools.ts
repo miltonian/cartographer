@@ -348,17 +348,18 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             metadata?: Record<string, unknown>;
           };
 
+        const ev = evidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
         const result = store.writeEntity({
           kind,
           name: entityName,
           description,
           evidence: {
-            anchors: evidence.anchors ?? [],
-            confidence: evidence.confidence,
-            provenance: evidence.provenance,
-            reasoning: evidence.reasoning,
+            anchors: ev.anchors ?? [],
+            confidence: ev.confidence ?? 'speculative',
+            provenance: ev.provenance ?? 'inferred',
+            reasoning: ev.reasoning,
             tool: 'agent',
-            supportingFacts: evidence.supportingFacts,
+            supportingFacts: ev.supportingFacts,
           },
           parentBoundary,
           metadata,
@@ -390,18 +391,19 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             };
           };
 
+        const ev2 = evidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
         const result = store.writeRelationship({
           kind,
           source,
           target,
           description,
           evidence: {
-            anchors: evidence.anchors ?? [],
-            confidence: evidence.confidence,
-            provenance: evidence.provenance,
-            reasoning: evidence.reasoning,
+            anchors: ev2.anchors ?? [],
+            confidence: ev2.confidence ?? 'speculative',
+            provenance: ev2.provenance ?? 'inferred',
+            reasoning: ev2.reasoning,
             tool: 'agent',
-            supportingFacts: evidence.supportingFacts,
+            supportingFacts: ev2.supportingFacts,
           },
         });
 
@@ -466,17 +468,18 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             };
           };
 
+        const ev3 = evidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
         const result = store.writeSlice({
           name: sliceName,
           description,
           steps,
           evidence: {
-            anchors: evidence.anchors ?? [],
-            confidence: evidence.confidence,
-            provenance: evidence.provenance,
-            reasoning: evidence.reasoning,
+            anchors: ev3.anchors ?? [],
+            confidence: ev3.confidence ?? 'speculative',
+            provenance: ev3.provenance ?? 'inferred',
+            reasoning: ev3.reasoning,
             tool: 'agent',
-            supportingFacts: evidence.supportingFacts,
+            supportingFacts: ev3.supportingFacts,
           },
         });
 
