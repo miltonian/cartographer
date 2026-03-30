@@ -99,7 +99,7 @@ export function FlowPanel({ slices, activeSliceId, onSelectSlice }: Props) {
             )}
             {/* Step previews */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
-              {slice.steps.map((step, i) => {
+              {(Array.isArray(slice.steps) ? slice.steps : []).map((step, i) => {
                 const name = step.entityId.includes(':')
                   ? step.entityId.split(':').slice(1).join(':')
                   : step.entityId;

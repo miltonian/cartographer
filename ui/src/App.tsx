@@ -153,7 +153,7 @@ export function App() {
   );
 
   const activeFlowEntityIds = useMemo(
-    () => (activeSlice ? new Set(activeSlice.steps.map((s) => s.entityId)) : null),
+    () => (activeSlice && Array.isArray(activeSlice.steps) ? new Set(activeSlice.steps.map((s) => s.entityId)) : null),
     [activeSlice],
   );
 
