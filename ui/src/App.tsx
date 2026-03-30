@@ -183,7 +183,7 @@ export function App() {
         {projection && projection.perspectives.length > 1 && (
           <PerspectiveSelector
             perspectives={projection.perspectives}
-            activePerspective={clientPerspective ?? projection.activePerspective}
+            activePerspective={clientPerspective ?? 'perspective:default'}
             onSwitch={handlePerspectiveSwitch}
           />
         )}
