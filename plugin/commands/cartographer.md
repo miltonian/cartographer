@@ -37,6 +37,12 @@ rm -f .cartographer/model.json
 
 Then confirm to the user that the model has been reset.
 
+### review-pr [number|branch]
+Visualize a PR on the Cartographer map.
+
+Invoke the `review-pr` skill with the PR identifier as the argument.
+Shows which entities are affected, the blast radius, and a review path.
+
 ### query <pattern>
 Search the world-model for entities matching the pattern.
 
