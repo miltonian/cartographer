@@ -33,17 +33,26 @@ interface SemanticNodeData {
   dimmed?: boolean;
   onFlow?: boolean;
   flowStep?: number;
+  changeType?: string;
   contextual?: boolean;
 }
+
+const CHANGE_TYPE_COLORS: Record<string, string> = {
+  added: '#22c55e',
+  modified: '#f59e0b',
+  removed: '#ef4444',
+  affected: '#64748b',
+};
 
 export const SemanticNode = memo(function SemanticNode({
   data,
 }: NodeProps & { data: SemanticNodeData }) {
-  const { label, kind, confidence, color, selected, dimmed, onFlow, flowStep, contextual } = data;
+  const { label, kind, confidence, color, selected, dimmed, onFlow, flowStep, changeType, contextual } = data;
   const confColor = CONFIDENCE_COLORS[confidence] ?? '#3f3f46';
   const shortKind = KIND_SHORT[kind] ?? kind.slice(0, 3).toUpperCase();
   const isActor = kind === 'actor';
   const ghostOpacity = contextual ? 0.3 : 1;
+  const changeColor = changeType ? CHANGE_TYPE_COLORS[changeType] ?? color : null;
 
   return (
     <>
@@ -63,17 +72,20 @@ export const SemanticNode = memo(function SemanticNode({
           opacity: dimmed ? 0.25 : ghostOpacity,
           boxShadow: selected
             ? `0 0 0 1px ${color}60, 0 0 12px ${color}20`
-            : onFlow
-              ? `0 0 0 1px ${color}40`
-              : '0 0 0 1px #1e1e21',
+            : changeColor
+              ? `0 0 0 1.5px ${changeColor}80`
+              : onFlow
+                ? `0 0 0 1px ${color}40`
+                : '0 0 0 1px #1e1e21',
+          textDecoration: changeType === 'removed' ? 'line-through' : undefined,
         }}
       >
-        {/* Left color stripe — wider for actors (entry points) */}
+        {/* Left color stripe — uses change color for PR changesets */}
         <div
           style={{
-            width: isActor ? 5 : 3,
+            width: changeColor ? 4 : isActor ? 5 : 3,
             alignSelf: 'stretch',
-            background: color,
+            background: changeColor ?? color,
             borderRadius: '6px 0 0 6px',
             marginRight: 8,
             opacity: selected || onFlow ? 1 : 0.7,
@@ -130,27 +142,30 @@ export const SemanticNode = memo(function SemanticNode({
           </div>
         </div>
 
-        {/* Flow step badge — shows position in active flow */}
-        {flowStep !== undefined && (
+        {/* Badge — change type for PRs, step number for flows */}
+        {(flowStep !== undefined || changeType) && (
           <div
             style={{
-              width: 18,
               height: 18,
-              borderRadius: '50%',
-              background: `${color}30`,
-              border: `1px solid ${color}60`,
+              minWidth: 18,
+              borderRadius: changeType ? 4 : '50%',
+              padding: changeType ? '0 5px' : 0,
+              background: changeColor ? `${changeColor}20` : `${color}30`,
+              border: `1px solid ${changeColor ? `${changeColor}60` : `${color}60`}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 9,
+              fontSize: changeType ? 8 : 9,
               fontWeight: 700,
-              color,
+              color: changeColor ?? color,
               flexShrink: 0,
               marginLeft: 4,
               marginRight: 2,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}
           >
-            {flowStep}
+            {changeType ?? flowStep}
           </div>
         )}
       </div>

@@ -42,6 +42,8 @@ export function FlowPanel({ slices, activeSliceId, onSelectSlice }: Props) {
 
       {slices.map((slice) => {
         const isActive = slice.id === activeSliceId;
+        const isChangeset = slice.kind === 'changeset';
+        const accentColor = isChangeset ? '#f59e0b' : '#818cf8';
         return (
           <button
             key={slice.id}
@@ -50,7 +52,7 @@ export function FlowPanel({ slices, activeSliceId, onSelectSlice }: Props) {
               display: 'block',
               width: '100%',
               padding: '10px 14px',
-              background: isActive ? '#818cf815' : 'transparent',
+              background: isActive ? `${accentColor}15` : 'transparent',
               border: 'none',
               borderBottom: '1px solid var(--border-subtle)',
               cursor: 'pointer',
@@ -63,10 +65,24 @@ export function FlowPanel({ slices, activeSliceId, onSelectSlice }: Props) {
               style={{
                 fontSize: 12,
                 fontWeight: 500,
-                color: isActive ? '#818cf8' : 'var(--text)',
+                color: isActive ? accentColor : 'var(--text)',
                 marginBottom: 3,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
+              {isChangeset && (
+                <span style={{
+                  fontSize: 8,
+                  padding: '1px 4px',
+                  borderRadius: 3,
+                  background: `${accentColor}20`,
+                  color: accentColor,
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                }}>PR</span>
+              )}
               {slice.name}
             </div>
             {slice.description && (
@@ -92,10 +108,23 @@ export function FlowPanel({ slices, activeSliceId, onSelectSlice }: Props) {
                     {i > 0 && (
                       <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>→</span>
                     )}
+                    {step.changeType && (
+                      <span style={{
+                        display: 'inline-block',
+                        width: 5,
+                        height: 5,
+                        borderRadius: '50%',
+                        background: step.changeType === 'added' ? '#22c55e'
+                          : step.changeType === 'modified' ? '#f59e0b'
+                          : step.changeType === 'removed' ? '#ef4444'
+                          : '#64748b',
+                        flexShrink: 0,
+                      }} />
+                    )}
                     <span
                       style={{
                         fontSize: 9,
-                        color: isActive ? '#818cf8cc' : 'var(--text-dim)',
+                        color: isActive ? `${accentColor}cc` : 'var(--text-dim)',
                         fontFamily: '"JetBrains Mono", monospace',
                       }}
                     >

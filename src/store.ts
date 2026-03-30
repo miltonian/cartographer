@@ -204,6 +204,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   writeSlice(input: {
     name: string;
     description?: string;
+    kind?: 'flow' | 'changeset';
     steps: SliceStep[];
     evidence: Omit<Evidence, 'id' | 'createdAt'>;
   }): { id: string; created: boolean } {
@@ -231,6 +232,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       id,
       name: input.name,
       description: input.description,
+      kind: input.kind,
       steps: input.steps,
       evidence: [evidenceEntry],
       createdAt: now,

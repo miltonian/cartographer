@@ -123,16 +123,23 @@ export interface WorldRelationship {
 // ─── Behavior Slices ───────────────────────────────────────────
 // A named, ordered path through the graph — a storyline.
 // "When X happens, these things fire in this order."
+// kind: 'flow' = runtime behavior, 'changeset' = PR/change review
+
+export type SliceKind = 'flow' | 'changeset';
+
+export type ChangeType = 'added' | 'modified' | 'removed' | 'affected';
 
 export interface SliceStep {
-  entityId: string;     // Reference to an entity in the model
-  label?: string;       // What happens at this step ("receives tool call", "persists to disk")
+  entityId: string;        // Reference to an entity in the model
+  label?: string;          // What happens at this step
+  changeType?: ChangeType; // For changesets: what type of change at this entity
 }
 
 export interface BehaviorSlice {
   id: string;
-  name: string;           // "Fact write lifecycle"
-  description?: string;   // "What happens when Claude records a finding"
+  name: string;           // "Fact write lifecycle" or "PR #123: Add auth"
+  description?: string;   // "What happens when..." or PR description
+  kind?: SliceKind;       // 'flow' (default) or 'changeset'
   steps: SliceStep[];     // Ordered path through entities
   evidence: Evidence[];
   createdAt: string;

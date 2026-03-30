@@ -100,12 +100,14 @@ export interface EntityDetails {
 export interface SliceStep {
   entityId: string;
   label?: string;
+  changeType?: 'added' | 'modified' | 'removed' | 'affected';
 }
 
 export interface BehaviorSlice {
   id: string;
   name: string;
   description?: string;
+  kind?: 'flow' | 'changeset';
   steps: SliceStep[];
   createdAt: string;
 }

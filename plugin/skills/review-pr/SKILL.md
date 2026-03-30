@@ -61,17 +61,21 @@ Order the affected entities from primary change to downstream impact:
 2. **Supporting changes** — entities that changed to support the core
 3. **Affected consumers** — entities that read/invoke the changed ones (blast radius)
 
-### 6. Create the PR slice
+### 6. Create the PR changeset
+
+Use `kind: "changeset"` and `changeType` on each step so the map renders
+change-type indicators (green=added, amber=modified, red=removed, gray=affected).
 
 ```
 cartographer_write_slice(
   name: "PR #123: Add auth middleware",
   description: "Adds authentication checks before write operations",
+  kind: "changeset",
   steps: [
-    { entityId: "capability:requireAuth", label: "ADDED: new auth middleware" },
-    { entityId: "capability:registerTools", label: "MODIFIED: added auth check before handler" },
-    { entityId: "entity:WorldModelStore", label: "AFFECTED: writes now require auth" },
-    { entityId: "capability:broadcast", label: "DOWNSTREAM: receives only authed writes" }
+    { entityId: "capability:requireAuth", changeType: "added", label: "new auth middleware" },
+    { entityId: "capability:registerTools", changeType: "modified", label: "added auth check before handler" },
+    { entityId: "entity:WorldModelStore", changeType: "affected", label: "writes now require auth" },
+    { entityId: "capability:broadcast", changeType: "affected", label: "receives only authed writes" }
   ],
   evidence: {
     anchors: [{ filePath: "...", lineStart: ..., lineEnd: ..., snippet: "..." }],
@@ -82,12 +86,11 @@ cartographer_write_slice(
 )
 ```
 
-Use these label prefixes:
-- `ADDED:` — new entity introduced by the PR
-- `MODIFIED:` — existing entity changed
-- `REMOVED:` — entity deleted by the PR
-- `AFFECTED:` — not changed directly but connected to something that was
-- `DOWNSTREAM:` — reads from or is invoked by a changed entity
+Set `changeType` on each step:
+- `added` — new entity introduced by the PR (green indicator)
+- `modified` — existing entity changed (amber indicator)
+- `removed` — entity deleted by the PR (red indicator, strikethrough)
+- `affected` — not changed directly but connected to something that was (gray indicator)
 
 ### 7. Open the map
 

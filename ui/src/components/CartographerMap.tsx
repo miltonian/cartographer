@@ -72,6 +72,7 @@ function toFlowNodes(
   selectedEntityId: string | null,
   activeFlowEntityIds: Set<string> | null,
   activeFlowStepMap: Map<string, number> | null,
+  activeFlowChangeTypes: Map<string, string> | null,
 ): Node[] {
   // Boundaries first (groups must be declared before children in React Flow)
   const sorted = [...projection.nodes].sort((a, b) => {
@@ -86,6 +87,7 @@ function toFlowNodes(
     const color = KIND_COLORS[n.kind] ?? '#71717a';
     const onFlow = activeFlowEntityIds?.has(n.id) ?? false;
     const flowStep = activeFlowStepMap?.get(n.id) ?? undefined;
+    const changeType = activeFlowChangeTypes?.get(n.id) ?? undefined;
     // Dim nodes not on the active flow
     const dimmed = hasActiveFlow && !onFlow && !n.isGroup;
 
@@ -123,6 +125,7 @@ function toFlowNodes(
         dimmed,
         onFlow,
         flowStep,
+        changeType,
         contextual: n.contextual ?? false,
       },
     };
@@ -162,11 +165,12 @@ interface Props {
   projection: MapProjection;
   selectedEntityId: string | null;
   activeFlowEntityIds: Set<string> | null;
+  activeFlowChangeTypes: Map<string, string> | null;
   onNodeClick: (entityId: string) => void;
   onBoundaryClick: (boundaryId: string) => void;
 }
 
-export function CartographerMap({ projection, selectedEntityId, activeFlowEntityIds, onNodeClick, onBoundaryClick }: Props) {
+export function CartographerMap({ projection, selectedEntityId, activeFlowEntityIds, activeFlowChangeTypes, onNodeClick, onBoundaryClick }: Props) {
   // Build a step-number map from the active flow
   const activeFlowStepMap = useMemo(
     () =>
@@ -177,7 +181,7 @@ export function CartographerMap({ projection, selectedEntityId, activeFlowEntity
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(
-    toFlowNodes(projection, selectedEntityId, activeFlowEntityIds, activeFlowStepMap),
+    toFlowNodes(projection, selectedEntityId, activeFlowEntityIds, activeFlowStepMap, activeFlowChangeTypes),
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     toFlowEdges(projection, selectedEntityId),
@@ -186,7 +190,7 @@ export function CartographerMap({ projection, selectedEntityId, activeFlowEntity
   useEffect(() => {
     setNodes((prev) => {
       const posMap = new Map(prev.map((n) => [n.id, n.position]));
-      return toFlowNodes(projection, selectedEntityId, activeFlowEntityIds, activeFlowStepMap).map((n) => ({
+      return toFlowNodes(projection, selectedEntityId, activeFlowEntityIds, activeFlowStepMap, activeFlowChangeTypes).map((n) => ({
         ...n,
         position: posMap.get(n.id) ?? n.position,
       }));

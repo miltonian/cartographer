@@ -168,17 +168,22 @@ const TOOLS = [
   {
     name: 'cartographer_write_slice',
     description:
-      'Record a behavior slice — a named storyline showing what happens when a specific action occurs. Steps are an ordered list of entity IDs with optional labels describing what happens at each step.',
+      'Record a behavior slice or changeset. For flows: a storyline of what happens when an action occurs. For changesets (PRs): the entities affected by a change, with change types.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         name: {
           type: 'string' as const,
-          description: 'Short name for the flow (e.g., "Fact write lifecycle", "Map render pipeline")',
+          description: 'Short name (e.g., "Fact write lifecycle" or "PR #123: Add auth")',
         },
         description: {
           type: 'string' as const,
-          description: 'What this flow represents — when does it happen, what triggers it',
+          description: 'What this represents',
+        },
+        kind: {
+          type: 'string' as const,
+          enum: ['flow', 'changeset'],
+          description: '"flow" for behavior narratives (default), "changeset" for PR reviews',
         },
         steps: {
           type: 'array' as const,
@@ -191,7 +196,12 @@ const TOOLS = [
               },
               label: {
                 type: 'string' as const,
-                description: 'What happens at this step (e.g., "receives tool call", "persists to disk")',
+                description: 'What happens at this step or what changed',
+              },
+              changeType: {
+                type: 'string' as const,
+                enum: ['added', 'modified', 'removed', 'affected'],
+                description: 'For changesets: the type of change at this entity',
               },
             },
             required: ['entityId'],
@@ -454,11 +464,12 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
       }
 
       case 'cartographer_write_slice': {
-        const { name: sliceName, description, steps, evidence } =
+        const { name: sliceName, description, kind, steps, evidence } =
           args as {
             name: string;
             description?: string;
-            steps: { entityId: string; label?: string }[];
+            kind?: 'flow' | 'changeset';
+            steps: { entityId: string; label?: string; changeType?: string }[];
             evidence: {
               anchors: SourceAnchor[];
               confidence: Confidence;
@@ -472,7 +483,12 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
         const result = store.writeSlice({
           name: sliceName,
           description,
-          steps,
+          kind,
+          steps: steps.map((s) => ({
+            entityId: s.entityId,
+            label: s.label,
+            changeType: s.changeType as import('../ontology.js').ChangeType | undefined,
+          })),
           evidence: {
             anchors: ev3.anchors ?? [],
             confidence: ev3.confidence ?? 'speculative',

@@ -136,16 +136,26 @@ export function App() {
     setSelectedEntity(null);
   }, []);
 
-  const activeFlowEntityIds = useMemo(
-    () =>
-      activeSliceId
-        ? new Set(
-            slices
-              .find((s) => s.id === activeSliceId)
-              ?.steps.map((s) => s.entityId) ?? [],
-          )
-        : null,
+  const activeSlice = useMemo(
+    () => (activeSliceId ? slices.find((s) => s.id === activeSliceId) ?? null : null),
     [activeSliceId, slices],
+  );
+
+  const activeFlowEntityIds = useMemo(
+    () => (activeSlice ? new Set(activeSlice.steps.map((s) => s.entityId)) : null),
+    [activeSlice],
+  );
+
+  const activeFlowChangeTypes = useMemo(
+    () => {
+      if (!activeSlice || activeSlice.kind !== 'changeset') return null;
+      const map = new Map<string, string>();
+      for (const step of activeSlice.steps) {
+        if (step.changeType) map.set(step.entityId, step.changeType);
+      }
+      return map.size > 0 ? map : null;
+    },
+    [activeSlice],
   );
 
   const isEmpty = !projection || projection.nodes.length === 0;
@@ -162,6 +172,7 @@ export function App() {
               projection={projection}
               selectedEntityId={selectedEntity?.entity.id ?? null}
               activeFlowEntityIds={activeFlowEntityIds}
+              activeFlowChangeTypes={activeFlowChangeTypes}
               onNodeClick={handleNodeClick}
               onBoundaryClick={handleBoundaryClick}
             />
