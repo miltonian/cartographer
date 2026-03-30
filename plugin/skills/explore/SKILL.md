@@ -125,6 +125,13 @@ Open the map. Tell the user what to explore first.
 - **Stop when you've said what matters.** You don't need to record every entity.
   The goal is understanding, not completeness.
 
+## Writing Descriptions
+
+The map is for everyone — engineers, PMs, designers, new team members. Write
+descriptions that anyone can read. Name things by what they do, not how they're
+implemented. Behavior flows should read like stories. Technical detail belongs
+in the evidence (source anchors), not the description.
+
 ## Evidence Rules
 
 Same as always:

@@ -114,6 +114,24 @@ As you analyze, you may notice:
 Record these with appropriate confidence levels. Don't force them — only record
 what you actually observe.
 
+## Writing Descriptions
+
+Descriptions should be readable by anyone — not just engineers. The map is
+a shared understanding surface. A PM, a designer, or a new team member should
+be able to read entity names and descriptions and understand what the system does.
+
+- Name entities by **what they do**, not how they're implemented.
+  Good: "Validate cart before checkout"
+  Bad: "validateCart middleware handler"
+- Write descriptions in **plain English** that explains the purpose.
+  Good: "Ensures the shopping cart is valid and all items are in stock before allowing payment"
+  Bad: "Express middleware that calls cartService.validate() and throws 400 on failure"
+- Behavior flow names should read like **stories**.
+  Good: "Customer checkout flow"
+  Bad: "POST /api/checkout handler chain"
+- Technical detail belongs in the **evidence** (source anchors, code snippets),
+  not in the description. The description is the "what and why." The evidence is the "where and how."
+
 ## Evidence Rules
 
 **Every fact MUST have evidence.**
