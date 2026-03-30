@@ -151,6 +151,8 @@ export interface BehaviorSlice {
 // and slices are in focus for a particular concern or question.
 // The "default" perspective is virtual — it always includes everything.
 
+export type PerspectiveSource = 'agent' | 'boundary';
+
 export interface Perspective {
   id: string;             // "perspective:auth"
   name: string;           // "auth"
@@ -158,6 +160,7 @@ export interface Perspective {
   entityIds: string[];    // Entities in focus for this perspective
   sliceIds: string[];     // Behavior slices relevant to this perspective
   isDefault?: boolean;    // True only for the virtual "default" perspective
+  source?: PerspectiveSource; // 'agent' = concern-based (shown as tab), 'boundary' = structural (accessed via semantic zoom)
   createdAt: string;
   updatedAt: string;
 }

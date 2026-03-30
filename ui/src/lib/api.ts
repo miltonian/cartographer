@@ -5,6 +5,7 @@ export interface PerspectiveSummary {
   name: string;
   entityCount: number;
   isDefault?: boolean;
+  source?: 'agent' | 'boundary';
 }
 
 export interface MapProjection {

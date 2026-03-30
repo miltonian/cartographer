@@ -416,6 +416,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       description: input.description,
       entityIds: [],
       sliceIds: [],
+      source: 'agent',
       createdAt: now,
       updatedAt: now,
     };
@@ -499,6 +500,7 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       description: `Inside boundary: ${boundary.name}`,
       entityIds: childIds,
       sliceIds: relevantSliceIds,
+      source: 'boundary',
       createdAt: now,
       updatedAt: now,
     };

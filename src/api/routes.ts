@@ -104,10 +104,9 @@ export function createRouter(store: WorldModelStore): Router {
   const projectionCache = new Map<string, MapProjection>();
   let projectionsDirty = true;
 
+  // Only invalidate layout on topology changes (new nodes/edges), not evidence updates
   store.on('entity:added', () => { projectionsDirty = true; });
-  store.on('entity:updated', () => { projectionsDirty = true; });
   store.on('relationship:added', () => { projectionsDirty = true; });
-  store.on('relationship:updated', () => { projectionsDirty = true; });
   store.on('model:cleared', () => {
     projectionsDirty = true;
     projectionCache.clear();

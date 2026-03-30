@@ -67,6 +67,7 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
     name: p.name,
     entityCount: p.isDefault ? entities.length : p.entityIds.length,
     isDefault: p.isDefault,
+    source: p.source,
   }));
 
   const empty: MapProjection = {
