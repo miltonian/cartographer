@@ -62,11 +62,26 @@ cartographer_write_entity(kind: "boundary", name: "<project-name>", ...)
 ```
 
 ### 2. Map Boundaries
-Examine directory structure and key files to identify subsystems.
-Look for patterns: `/auth`, `/api`, `/db`, `/lib`, `/components`, service directories, etc.
+Identify the system's major **concerns** — not its directory structure. Ask:
+"What are the major things this system does? What would break together if
+I changed something?"
 
-For each subsystem, record a boundary entity with evidence from the directory structure
-and key files that define it.
+Good boundaries are based on purpose:
+- "Authentication" (not `/auth`)
+- "Data persistence" (not `/db`)
+- "User-facing API" (not `/routes`)
+
+Bad boundaries mirror directories:
+- "src" — meaningless, just a folder
+- "lib" — organizational, not conceptual
+- "components" — too generic
+
+A concern might span multiple directories. An auth boundary might include
+middleware from `/middleware`, handlers from `/api`, and models from `/db`.
+That's correct — the boundary represents the concern, not the folder.
+
+For each concern, record a boundary entity with evidence from the code that
+defines it.
 
 ### 3. Find Actors (Entrypoints)
 Identify where external intent enters the system:

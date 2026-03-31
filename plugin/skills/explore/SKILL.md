@@ -29,12 +29,17 @@ All Cartographer tools are available:
 ### Phase 1: Orient
 
 Set the project root. Read the project: README, config files, directory structure,
-entry points. Build the overview model — boundaries, actors, top-level capabilities.
+entry points.
 
-Record this to the default perspective.
+Identify the system's major **concerns** — what does it DO, not where are its
+files. Boundaries should represent purpose ("authentication", "data pipeline",
+"real-time updates"), not directories ("src", "lib", "components"). A concern
+can span multiple directories.
 
-After this phase, you should be able to answer: "What is this system and what are
-its major parts?"
+Record boundaries, actors, and top-level capabilities to the default perspective.
+
+After this phase, you should be able to answer: "What does this system do and
+what are its major concerns?"
 
 ### Phase 2: Identify What Matters
 
