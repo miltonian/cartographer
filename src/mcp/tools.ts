@@ -352,6 +352,20 @@ const TOOLS = [
     },
   },
   {
+    name: 'cartographer_delete_entity',
+    description: 'Delete an entity and all its relationships from the model. Use to correct mistakes or remove stale entities.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        id: {
+          type: 'string' as const,
+          description: 'Entity ID to delete (e.g., "capability:oldFunction")',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'cartographer_clear',
     description: 'Reset the world-model. Destructive — removes all entities and relationships.',
     inputSchema: {
@@ -731,6 +745,20 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
               text: JSON.stringify({ url, message: 'Map opened in browser' }),
             },
           ],
+        };
+      }
+
+      case 'cartographer_delete_entity': {
+        const { id } = args as { id: string };
+        const deleted = store.deleteEntity(id);
+        if (!deleted) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: `Entity not found: ${id}` }) }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ deleted: id }) }],
         };
       }
 

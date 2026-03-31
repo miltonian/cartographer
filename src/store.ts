@@ -394,6 +394,25 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     this.emit('model:cleared');
   }
 
+  deleteEntity(id: string): boolean {
+    if (!this.entities.has(id)) return false;
+    this.entities.delete(id);
+    // Remove all relationships involving this entity
+    for (const [relId, rel] of this.relationships.entries()) {
+      if (rel.source === id || rel.target === id) {
+        this.relationships.delete(relId);
+      }
+    }
+    // Remove from all perspectives
+    for (const p of this.perspectives.values()) {
+      const idx = p.entityIds.indexOf(id);
+      if (idx >= 0) p.entityIds.splice(idx, 1);
+    }
+    this.markDirty();
+    this.emit('entity:added', { id } as WorldEntity); // Triggers projection rebuild
+    return true;
+  }
+
   getSlices(): BehaviorSlice[] {
     return Array.from(this.slices.values());
   }
