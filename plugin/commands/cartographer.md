@@ -16,11 +16,11 @@ Systematically analyze the current codebase and build a world-model.
 Invoke the `analyze` skill to guide the process.
 
 ### explore
-Deep autonomous exploration. The agent decides what matters, creates
-perspectives for key areas, goes deep with sub-boundaries, traces
-cross-cutting flows, and surfaces risks.
+Deep autonomous exploration with persistent memory. The explorer agent
+decides what matters, creates perspectives, goes deep, and accumulates
+understanding across sessions.
 
-Invoke the `explore` skill.
+Delegate to the `explorer` agent.
 
 ### status
 Show the current state of the world-model.
