@@ -11,6 +11,19 @@ You are doing a full, autonomous exploration of this codebase. You make every
 decision: what behaviors to trace, how deep to go, what concerns to surface.
 The user is not guiding you — you are the cartographer.
 
+## CRITICAL: Tool Availability Check
+
+Before starting and periodically during exploration, verify the Cartographer
+MCP tools are available by calling `cartographer_get_summary`. If ANY
+cartographer_* tools become unavailable or fail, **STOP IMMEDIATELY** and
+tell the user:
+
+"The Cartographer MCP tools disconnected. The exploration cannot continue
+without them. Please check the service and restart."
+
+Do NOT continue exploring without the tools. Do NOT silently skip recording.
+An exploration that reads code but doesn't record findings is wasted work.
+
 ## Available MCP Tools
 
 All Cartographer tools are available:

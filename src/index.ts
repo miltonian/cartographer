@@ -146,6 +146,18 @@ store.on('model:cleared', () => {
   broadcast({ type: 'model:cleared', data: null });
 });
 
+// ─── Error Handling ───────────────────────────────────────────
+// Prevent unhandled errors from crashing the MCP server.
+// The MCP connection must stay alive for Claude Code to use tools.
+
+process.on('uncaughtException', (err) => {
+  log('Uncaught exception (keeping server alive):', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log('Unhandled rejection (keeping server alive):', reason);
+});
+
 // ─── Graceful Shutdown ─────────────────────────────────────────
 
 function shutdown() {

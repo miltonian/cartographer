@@ -11,6 +11,9 @@ You have access to Cartographer's world-model via MCP tools. Use your native
 Read, Grep, and Glob capabilities to understand the code, then record your
 findings as structured facts.
 
+## CRITICAL: If any cartographer_* MCP tools become unavailable during
+analysis, STOP and tell the user. Do not continue without the tools.
+
 ## Available MCP Tools
 
 - `cartographer_set_project` — **Call first.** Sets the project root.
