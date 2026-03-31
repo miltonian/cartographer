@@ -11,36 +11,41 @@ You are doing a full, autonomous exploration of this codebase. You make every
 decision: what behaviors to trace, how deep to go, what concerns to surface.
 The user is not guiding you — you are the cartographer.
 
-## CRITICAL: Tool Availability Check
+## CRITICAL: Tool Availability
 
-Before starting and periodically during exploration, verify the Cartographer
-MCP tools are available by calling `cartographer_get_summary`. If ANY
-cartographer_* tools become unavailable or fail, **STOP IMMEDIATELY** and
-tell the user:
+Before starting, call `cartographer_get_summary` to verify the MCP tools work.
+If ANY cartographer_* tool fails or becomes unavailable during exploration,
+**STOP IMMEDIATELY** and tell the user. Do NOT continue without the tools.
 
-"The Cartographer MCP tools disconnected. The exploration cannot continue
-without them. Please check the service and restart."
+## Core MCP Tools
 
-Do NOT continue exploring without the tools. Do NOT silently skip recording.
-An exploration that reads code but doesn't record findings is wasted work.
+These are the tools you MUST use. Verify each exists before relying on it:
 
-## Available MCP Tools
+- `cartographer_set_project` — set project root (call first)
+- `cartographer_write_entity` — record entities (boundaries, capabilities, actors, etc.)
+- `cartographer_write_relationship` — record relationships between entities
+- `cartographer_write_slice` — record behavior flows
+- `cartographer_query` — search the model
+- `cartographer_get_summary` — model statistics
+- `cartographer_snapshot` — save a backup
+- `cartographer_open_map` — open browser UI
 
-All Cartographer tools are available:
-- `cartographer_set_project`, `cartographer_create_perspective`,
-  `cartographer_switch_perspective`, `cartographer_write_entity`,
-  `cartographer_write_relationship`, `cartographer_write_slice`,
-  `cartographer_query`, `cartographer_get_summary`,
-  `cartographer_open_map`, `cartographer_snapshot`
+Optional tools (use if available, skip gracefully if not):
+- `cartographer_create_perspective` — create a named lens
+- `cartographer_switch_perspective` — switch active lens
+- `cartographer_list_perspectives` — list perspectives
+
+If perspective tools aren't available, you can still create sub-boundaries
+and behavior slices — those are the primary depth mechanisms.
 
 ## Exploration Protocol
 
 ### Phase 1: Orient
 
-Set the project root. Read the project: README, config files, entry points.
+Set the project root. Save a snapshot (`cartographer_snapshot` with label
+"pre-exploration"). Read the project: README, config files, entry points.
 
-Understand what this system does — not what files it has. Answer:
-**"What are the most important things that happen in this system?"**
+Answer: **"What are the most important things that happen in this system?"**
 
 ### Phase 2: Trace the Major Behaviors
 
@@ -52,70 +57,85 @@ Identify the 3-7 most important things the system does. For each one:
 4. Record the relationships between them
 5. Record the full path as a behavior slice
 
-**Behaviors first, structure second.** The entities emerge from the flows.
-You don't catalog parts and then connect them — you follow what happens
-and record what you find.
+**Behaviors first, structure second.** Entities emerge from the flows.
 
 ### Phase 3: Let Boundaries Emerge
 
-After tracing behaviors, look at what you recorded. Which entities cluster
-together? Which participate in the same flows? Name those clusters by
-**concern** — what they do, not where the files live.
+Look at what you recorded. Which entities cluster together? Which participate
+in the same flows? Name those clusters by **concern**.
 
-Record boundaries and assign entities to them.
+Record boundaries and assign entities to them via `parentBoundary`.
 
-### Phase 4: Go Deep (Recursive)
+### Phase 4: Go Deep (Recursive) — THIS IS NOT OPTIONAL
 
-For each entity you recorded, ask yourself: **"Is this complex enough that
-someone would want to zoom into it?"**
+This phase is where the real value is. Do not skip it.
 
-If yes:
-1. Create a sub-boundary
-2. Explore its internal structure (methods → capabilities, state → entities)
-3. Trace internal flows
-4. Ask the same question for each thing you find inside
+**Hard rules:**
+- Every boundary with more than 3 entities MUST get at least one sub-boundary
+- You MUST reach at least depth 2 in every major boundary
+- For each sub-boundary, trace at least one internal behavior flow
 
-Keep going until the answer is "no, this is simple enough as a single node."
-Maximum depth: 4 levels.
+**Process for each boundary:**
+1. Read the source code for the key entities in this boundary
+2. Identify internal structure: classes with multiple methods, modules with
+   multiple exports, handlers with multiple steps
+3. Create a sub-boundary for each significant internal structure:
+   ```
+   cartographer_write_entity(kind: "boundary", name: "Store write operations",
+     parentBoundary: "boundary:World Model", ...)
+   ```
+4. Record the internal capabilities, entities, invariants, failure points
+   as children of the sub-boundary
+5. Trace internal behavior flows as slices
+6. Ask yourself: "Should I go deeper on any of these?" If yes, repeat.
 
-Create perspectives for important areas so users can view them independently.
+Maximum depth: 4 levels. But you MUST reach at least 2.
 
 ### Phase 5: Cross-Cutting Patterns
 
-Step back. Look across the behaviors you traced. Create perspectives for
-patterns that span boundaries:
+Look across boundaries for patterns that span them:
+- Data flow from entry to storage to output
+- Error propagation and handling
+- Security/trust boundaries
+- External dependencies
 
-- How data flows from entry to storage to output
-- How errors propagate and where they're handled (or not)
-- Where trust boundaries exist and how they're enforced
-- What external systems are depended on
+Record these as behavior slices that cross boundary lines.
 
-You decide which cross-cutting views are worth creating. Choose the ones
-that reveal something the behavior-by-behavior view doesn't.
+### Pre-Synthesis Checkpoint — REQUIRED
+
+Before moving to synthesis, verify your work:
+
+1. Call `cartographer_get_summary` and check:
+   - You have entities across multiple boundaries
+   - You have behavior slices
+   - Total entity count is reasonable for the codebase size
+
+2. Check depth: look at your boundaries. If ANY boundary has more than
+   3 entities and NO sub-boundaries, go back to Phase 4 for that boundary.
+
+3. Check flows: you should have at least 3 behavior slices. If you have
+   fewer, go back to Phase 2 and trace more behaviors.
+
+If the checkpoint fails, go back to the relevant phase. Do NOT synthesize
+a shallow model.
 
 ### Phase 6: Synthesis
 
-Report to the user:
+Only after passing the checkpoint:
 
 1. **The behaviors** — the key stories of what this system does
 2. **What surprised you** — risks, clever patterns, missing pieces
 3. **Concerns** — things that look fragile or unclear
-4. **Perspectives** — what lenses are available to explore
+4. **Depth achieved** — what sub-boundaries you created and what they reveal
 
 Open the map. Tell the user which behavior to start with.
 
 ## Decision Principles
 
-- **Lead with what happens, not what exists.** Behaviors produce understanding.
-  Parts lists don't.
-- **Boundaries emerge from behavior.** Things that participate in the same
-  flows and break together belong together.
-- **Depth is recursive and self-assessed.** You decide at each level whether
-  to go deeper. Not every entity needs internal structure.
-- **Record what you notice, not just what you catalog.** An invariant you
-  spot across 5 functions is more valuable than 50 function names.
-- **Stop when you've said what matters.** Completeness is not the goal.
-  Understanding is.
+- **Lead with what happens, not what exists.**
+- **Boundaries emerge from behavior.**
+- **Depth is mandatory, not optional.** Every significant boundary gets sub-structure.
+- **Record what you notice, not just what you catalog.**
 
 ## Writing Descriptions
 
