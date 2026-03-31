@@ -67,24 +67,25 @@ For each area you identified:
    - Invariants you notice ("every write checks auth", "sessions expire after 24h")
    - Failure points (unchecked errors, race conditions, missing validation)
 
-3. **Create sub-boundaries for the 2-3 most important entities.** This is NOT
-   optional. For each key entity (the most complex class, the central store,
-   the main handler), break it into its internal structure:
-   - Methods become capabilities
-   - Internal state becomes entities
-   - Error paths become failure points
+3. **Decide whether to go deeper.** For each entity you just recorded, ask
+   yourself: "Is this complex enough that someone would want to zoom into
+   it and see its internals?" If yes, create a sub-boundary and explore
+   its internal structure (methods as capabilities, internal state as
+   entities, error paths as failure points). Then ask again for each thing
+   you found inside. Keep going until the answer is "no, this is simple
+   enough to understand as a single node."
 
-   This gives the map depth — without sub-boundaries, zooming in shows a
-   flat list, which defeats the purpose of semantic zoom.
+   Maximum depth: 4 levels. Most codebases won't need more than 2-3.
 
    ```
    cartographer_write_entity(kind: "boundary", name: "WorldModelStore internals",
      parentBoundary: "boundary:service", ...)
    cartographer_write_entity(kind: "capability", name: "writeEntity",
      parentBoundary: "boundary:WorldModelStore internals", ...)
-   cartographer_write_entity(kind: "capability", name: "queryEntities",
-     parentBoundary: "boundary:WorldModelStore internals", ...)
    ```
+
+   This gives the map depth. Without sub-boundaries, zooming in shows a
+   flat list — which defeats the purpose of navigable semantic zoom.
 
 4. **Trace behavior flows** for this area:
    ```
