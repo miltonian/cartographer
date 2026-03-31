@@ -21,7 +21,7 @@ fi
 DATA_DIR="${CARTOGRAPHER_DATA:-$HOME/.cartographer-service}"
 SERVICE="$DATA_DIR/repo"
 VERSION_FILE="$DATA_DIR/.version"
-TARGET_VERSION="0.1.0"
+TARGET_VERSION=$(python3 -c "import json; print(json.load(open('$PLUGIN_DIR/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "0.0.0")
 
 needs_install() {
   [ ! -f "$SERVICE/package.json" ] && return 0
