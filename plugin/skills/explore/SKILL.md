@@ -67,10 +67,23 @@ For each area you identified:
    - Invariants you notice ("every write checks auth", "sessions expire after 24h")
    - Failure points (unchecked errors, race conditions, missing validation)
 
-3. **Create sub-boundaries** if the area has clear internal structure:
+3. **Create sub-boundaries for the 2-3 most important entities.** This is NOT
+   optional. For each key entity (the most complex class, the central store,
+   the main handler), break it into its internal structure:
+   - Methods become capabilities
+   - Internal state becomes entities
+   - Error paths become failure points
+
+   This gives the map depth — without sub-boundaries, zooming in shows a
+   flat list, which defeats the purpose of semantic zoom.
+
    ```
-   cartographer_write_entity(kind: "boundary", name: "token-validation",
-     parentBoundary: "boundary:auth", ...)
+   cartographer_write_entity(kind: "boundary", name: "WorldModelStore internals",
+     parentBoundary: "boundary:service", ...)
+   cartographer_write_entity(kind: "capability", name: "writeEntity",
+     parentBoundary: "boundary:WorldModelStore internals", ...)
+   cartographer_write_entity(kind: "capability", name: "queryEntities",
+     parentBoundary: "boundary:WorldModelStore internals", ...)
    ```
 
 4. **Trace behavior flows** for this area:
