@@ -1,144 +1,67 @@
 ---
 name: explore
-description: Deep autonomous exploration of a codebase — traces behaviors, discovers structure, goes deep recursively, surfaces cross-cutting patterns
+description: Deep autonomous codebase exploration — traces behaviors end-to-end, creates boundaries by concern, builds navigable depth with sub-boundaries, enforces quality via cartographer_check_depth. Use when the user says explore, map, understand, or analyze deeply.
 model: opus
 effort: high
 ---
 
-# Deep Codebase Exploration
+# Codebase Exploration
 
-You are doing a full, autonomous exploration of this codebase. You make every
-decision: what behaviors to trace, how deep to go, what concerns to surface.
-The user is not guiding you — you are the cartographer.
+Verify tools work: call `cartographer_get_summary`. If it fails, stop and
+tell the user the Cartographer MCP tools are not connected.
 
-## CRITICAL: Tool Availability
+Set the project root: `cartographer_set_project`.
+Save a snapshot: `cartographer_snapshot` with label "pre-exploration".
 
-Before starting, call `cartographer_get_summary` to verify the MCP tools work.
-If ANY cartographer_* tool fails or becomes unavailable during exploration,
-**STOP IMMEDIATELY** and tell the user. Do NOT continue without the tools.
+## Checklist
 
-## Core MCP Tools
+Copy this checklist. Track progress. Do not skip items.
 
-These are the tools you MUST use. Verify each exists before relying on it:
+```
+Exploration Progress:
+- [ ] Orient: read project, understand what it does
+- [ ] Behaviors: trace 3-7 key behaviors end-to-end as slices
+- [ ] Boundaries: cluster entities by concern, record boundaries
+- [ ] Depth: create sub-boundaries (check_depth must pass)
+- [ ] Perspectives: create at least one focused perspective
+- [ ] Synthesis: report findings to user
+```
 
-- `cartographer_set_project` — set project root (call first)
-- `cartographer_write_entity` — record entities (boundaries, capabilities, actors, etc.)
-- `cartographer_write_relationship` — record relationships between entities
-- `cartographer_write_slice` — record behavior flows
-- `cartographer_query` — search the model
-- `cartographer_get_summary` — model statistics
-- `cartographer_snapshot` — save a backup
-- `cartographer_open_map` — open browser UI
+## How to Explore
 
-Optional tools (use if available, skip gracefully if not):
-- `cartographer_create_perspective` — create a named lens
-- `cartographer_switch_perspective` — switch active lens
-- `cartographer_list_perspectives` — list perspectives
+**Behaviors first.** Identify what the system DOES, not what files it has.
+Trace each behavior from entry point to completion. Record entities as
+encountered: actors, capabilities, state, side effects, invariants, failure
+points. Record each path as a behavior slice.
 
-If perspective tools aren't available, you can still create sub-boundaries
-and behavior slices — those are the primary depth mechanisms.
+**Boundaries emerge from behaviors.** After tracing flows, cluster entities
+that participate in the same behaviors. Name by concern ("authentication",
+"payment processing"), NEVER by directory ("src", "lib", "components").
 
-## Exploration Protocol
+**Depth is mandatory.** Every boundary with more than 3 entities must have
+sub-boundaries. Read the source for the key classes/functions inside each
+boundary. Create a child boundary. Record its internal capabilities, state,
+invariants as children.
 
-### Phase 1: Orient
+**Perspectives for navigation.** Create at least one perspective for the
+most important concern. If `cartographer_create_perspective` is unavailable,
+skip gracefully — sub-boundaries and slices provide depth regardless.
 
-Set the project root. Save a snapshot (`cartographer_snapshot` with label
-"pre-exploration"). Read the project: README, config files, entry points.
+## Before Finishing
 
-Answer: **"What are the most important things that happen in this system?"**
+Call `cartographer_check_depth`. Fix every issue it reports. Call it again.
+Repeat until `passed: true`. Do NOT report to the user until it passes.
 
-### Phase 2: Trace the Major Behaviors
+## Bad exploration (avoid)
 
-Identify the 3-7 most important things the system does. For each one:
+- 50 entities, all flat, no sub-boundaries, no slices — a parts list
+- Boundaries named "Service", "UI", "Plugin" — directory mirrors
+- Descriptions like "Express middleware handler" — engineer jargon
+- No behavior flows — structure without stories
 
-1. Find where it starts (the actor / entry point)
-2. Follow the code path end-to-end
-3. Record every entity you encounter (actors, capabilities, state, side effects)
-4. Record the relationships between them
-5. Record the full path as a behavior slice
+## Good exploration
 
-**Behaviors first, structure second.** Entities emerge from the flows.
-
-### Phase 3: Let Boundaries Emerge
-
-Look at what you recorded. Which entities cluster together? Which participate
-in the same flows? Name those clusters by **concern**.
-
-Record boundaries and assign entities to them via `parentBoundary`.
-
-### Phase 4: Go Deep (Recursive) — THIS IS NOT OPTIONAL
-
-This phase is where the real value is. Do not skip it.
-
-**Hard rules:**
-- Every boundary with more than 3 entities MUST get at least one sub-boundary
-- You MUST reach at least depth 2 in every major boundary
-- For each sub-boundary, trace at least one internal behavior flow
-
-**Process for each boundary:**
-1. Read the source code for the key entities in this boundary
-2. Identify internal structure: classes with multiple methods, modules with
-   multiple exports, handlers with multiple steps
-3. Create a sub-boundary for each significant internal structure:
-   ```
-   cartographer_write_entity(kind: "boundary", name: "Store write operations",
-     parentBoundary: "boundary:World Model", ...)
-   ```
-4. Record the internal capabilities, entities, invariants, failure points
-   as children of the sub-boundary
-5. Trace internal behavior flows as slices
-6. Ask yourself: "Should I go deeper on any of these?" If yes, repeat.
-
-Maximum depth: 4 levels. But you MUST reach at least 2.
-
-### Phase 5: Cross-Cutting Patterns
-
-Look across boundaries for patterns that span them:
-- Data flow from entry to storage to output
-- Error propagation and handling
-- Security/trust boundaries
-- External dependencies
-
-Record these as behavior slices that cross boundary lines.
-
-### Pre-Synthesis Checkpoint — REQUIRED
-
-Call `cartographer_check_depth`. This tool programmatically checks your work
-and returns a list of concrete issues.
-
-If `passed: false`, fix EVERY issue in the list before continuing:
-- "boundary X has N entities and 0 sub-boundaries" → go back to Phase 4 for that boundary
-- "Only N behavior slices" → go back to Phase 2 and trace more flows
-- "No perspectives created" → create at least one perspective
-
-Call `cartographer_check_depth` again after fixing. Repeat until `passed: true`.
-
-Do NOT move to Phase 6 until the check passes.
-
-### Phase 6: Synthesis
-
-Only after passing the checkpoint:
-
-1. **The behaviors** — the key stories of what this system does
-2. **What surprised you** — risks, clever patterns, missing pieces
-3. **Concerns** — things that look fragile or unclear
-4. **Depth achieved** — what sub-boundaries you created and what they reveal
-
-Open the map. Tell the user which behavior to start with.
-
-## Decision Principles
-
-- **Lead with what happens, not what exists.**
-- **Boundaries emerge from behavior.**
-- **Depth is mandatory, not optional.** Every significant boundary gets sub-structure.
-- **Record what you notice, not just what you catalog.**
-
-## Writing Descriptions
-
-The map is for everyone. Name things by what they do. Behavior flows should
-read like stories. Technical detail belongs in the evidence, not the description.
-
-## Evidence Rules
-
-Every fact must have source anchors. `proven` for direct observations.
-Include reasoning for anything below proven.
+- 30 entities with 2+ depth levels and 5 behavior flows — a navigable map
+- Boundaries named "Payment processing", "Real-time sync" — concerns
+- Descriptions like "Validates cart before checkout" — readable by anyone
+- Stories: "When a user checks out, this chain fires"
