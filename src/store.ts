@@ -394,6 +394,37 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     this.emit('model:cleared');
   }
 
+  checkDepth(): { passed: boolean; issues: string[] } {
+    const issues: string[] = [];
+    const boundaries = Array.from(this.entities.values()).filter((e) => e.kind === 'boundary');
+
+    for (const boundary of boundaries) {
+      const children = Array.from(this.entities.values()).filter(
+        (e) => e.parentBoundary === boundary.id,
+      );
+      const subBoundaries = children.filter((c) => c.kind === 'boundary');
+      if (children.length > 3 && subBoundaries.length === 0) {
+        issues.push(
+          `${boundary.id} has ${children.length} entities and 0 sub-boundaries — create internal structure`,
+        );
+      }
+    }
+
+    const sliceCount = this.slices.size;
+    if (sliceCount < 3) {
+      issues.push(`Only ${sliceCount} behavior slices — trace at least 3 flows`);
+    }
+
+    const nonDefaultPerspectives = Array.from(this.perspectives.values()).filter(
+      (p) => !p.isDefault,
+    );
+    if (nonDefaultPerspectives.length === 0 && boundaries.length > 1) {
+      issues.push('No perspectives created — create at least one for a key concern');
+    }
+
+    return { passed: issues.length === 0, issues };
+  }
+
   deleteEntity(id: string): boolean {
     if (!this.entities.has(id)) return false;
     this.entities.delete(id);

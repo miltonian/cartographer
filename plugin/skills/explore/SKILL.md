@@ -103,21 +103,17 @@ Record these as behavior slices that cross boundary lines.
 
 ### Pre-Synthesis Checkpoint — REQUIRED
 
-Before moving to synthesis, verify your work:
+Call `cartographer_check_depth`. This tool programmatically checks your work
+and returns a list of concrete issues.
 
-1. Call `cartographer_get_summary` and check:
-   - You have entities across multiple boundaries
-   - You have behavior slices
-   - Total entity count is reasonable for the codebase size
+If `passed: false`, fix EVERY issue in the list before continuing:
+- "boundary X has N entities and 0 sub-boundaries" → go back to Phase 4 for that boundary
+- "Only N behavior slices" → go back to Phase 2 and trace more flows
+- "No perspectives created" → create at least one perspective
 
-2. Check depth: look at your boundaries. If ANY boundary has more than
-   3 entities and NO sub-boundaries, go back to Phase 4 for that boundary.
+Call `cartographer_check_depth` again after fixing. Repeat until `passed: true`.
 
-3. Check flows: you should have at least 3 behavior slices. If you have
-   fewer, go back to Phase 2 and trace more behaviors.
-
-If the checkpoint fails, go back to the relevant phase. Do NOT synthesize
-a shallow model.
+Do NOT move to Phase 6 until the check passes.
 
 ### Phase 6: Synthesis
 

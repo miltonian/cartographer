@@ -352,6 +352,14 @@ const TOOLS = [
     },
   },
   {
+    name: 'cartographer_check_depth',
+    description: 'Check if the world-model has sufficient depth before synthesizing. Returns concrete issues that must be fixed. Call this BEFORE reporting results to the user.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
     name: 'cartographer_delete_entity',
     description: 'Delete an entity and all its relationships from the model. Use to correct mistakes or remove stale entities.',
     inputSchema: {
@@ -745,6 +753,13 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
               text: JSON.stringify({ url, message: 'Map opened in browser' }),
             },
           ],
+        };
+      }
+
+      case 'cartographer_check_depth': {
+        const result = store.checkDepth();
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
         };
       }
 
