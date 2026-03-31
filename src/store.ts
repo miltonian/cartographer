@@ -443,6 +443,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       updatedAt: now,
     };
     this.perspectives.set(id, perspective);
+    // Auto-switch so entities written after creation join this perspective
+    this.activePerspectiveId = id;
     this.markDirty();
     return perspective;
   }

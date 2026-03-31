@@ -256,7 +256,7 @@ const TOOLS = [
   {
     name: 'cartographer_create_perspective',
     description:
-      'Create a named perspective (lens) over the shared entity pool. Use for focused analysis of a specific concern — e.g., "auth", "data-pipeline", "checkout-flow". Entities written while this perspective is active will auto-join it.',
+      'Create a named perspective AND switch to it. Entities and slices written after this call auto-join the new perspective. No need to call switch_perspective separately.',
     inputSchema: {
       type: 'object' as const,
       properties: {
