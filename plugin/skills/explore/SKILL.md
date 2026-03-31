@@ -1,6 +1,6 @@
 ---
 name: explore
-description: Deep autonomous exploration of a codebase — the agent decides what matters, creates perspectives, goes deep where it counts, and surfaces cross-cutting patterns
+description: Deep autonomous exploration of a codebase — traces behaviors, discovers structure, goes deep recursively, surfaces cross-cutting patterns
 model: opus
 effort: high
 ---
@@ -8,153 +8,108 @@ effort: high
 # Deep Codebase Exploration
 
 You are doing a full, autonomous exploration of this codebase. You make every
-decision: what to focus on, how deep to go, what perspectives to create, what
-risks to surface. The user is not guiding you — you are the cartographer.
+decision: what behaviors to trace, how deep to go, what concerns to surface.
+The user is not guiding you — you are the cartographer.
 
 ## Available MCP Tools
 
 All Cartographer tools are available:
-- `cartographer_set_project` — set project root
-- `cartographer_create_perspective` — create a named lens
-- `cartographer_switch_perspective` — switch active lens
-- `cartographer_write_entity` — record entities
-- `cartographer_write_relationship` — record relationships
-- `cartographer_write_slice` — record behavior flows
-- `cartographer_query` — query the model
-- `cartographer_get_summary` — model statistics
-- `cartographer_open_map` — open browser visualization
+- `cartographer_set_project`, `cartographer_create_perspective`,
+  `cartographer_switch_perspective`, `cartographer_write_entity`,
+  `cartographer_write_relationship`, `cartographer_write_slice`,
+  `cartographer_query`, `cartographer_get_summary`,
+  `cartographer_open_map`, `cartographer_snapshot`
 
 ## Exploration Protocol
 
 ### Phase 1: Orient
 
-Set the project root. Read the project: README, config files, directory structure,
-entry points.
+Set the project root. Read the project: README, config files, entry points.
 
-Identify the system's major **concerns** — what does it DO, not where are its
-files. Boundaries should represent purpose ("authentication", "data pipeline",
-"real-time updates"), not directories ("src", "lib", "components"). A concern
-can span multiple directories.
+Understand what this system does — not what files it has. Answer:
+**"What are the most important things that happen in this system?"**
 
-Record boundaries, actors, and top-level capabilities to the default perspective.
+### Phase 2: Trace the Major Behaviors
 
-After this phase, you should be able to answer: "What does this system do and
-what are its major concerns?"
+Identify the 3-7 most important things the system does. For each one:
 
-### Phase 2: Identify What Matters
+1. Find where it starts (the actor / entry point)
+2. Follow the code path end-to-end
+3. Record every entity you encounter (actors, capabilities, state, side effects)
+4. Record the relationships between them
+5. Record the full path as a behavior slice
 
-Look at what you found. Make a judgment call:
+**Behaviors first, structure second.** The entities emerge from the flows.
+You don't catalog parts and then connect them — you follow what happens
+and record what you find.
 
-- Which boundaries are the most complex? (most files, most capabilities)
-- Which areas handle the most critical concerns? (auth, payments, data integrity)
-- Which parts are most interconnected? (highest relationship count)
-- Where do you sense the most risk? (complexity, implicit assumptions, missing validation)
+### Phase 3: Let Boundaries Emerge
 
-Rank them. You're about to go deep on each one, and you should start with what
-matters most.
+After tracing behaviors, look at what you recorded. Which entities cluster
+together? Which participate in the same flows? Name those clusters by
+**concern** — what they do, not where the files live.
 
-**This is YOUR decision.** Don't ask the user. Use your judgment.
+Record boundaries and assign entities to them.
 
-### Phase 3: Deep Exploration (Iterative)
+### Phase 4: Go Deep (Recursive)
 
-For each area you identified:
+For each entity you recorded, ask yourself: **"Is this complex enough that
+someone would want to zoom into it?"**
 
-1. **Create a perspective** for this area:
-   ```
-   cartographer_create_perspective(name: "auth", description: "Authentication and session management")
-   cartographer_switch_perspective(name: "auth")
-   ```
+If yes:
+1. Create a sub-boundary
+2. Explore its internal structure (methods → capabilities, state → entities)
+3. Trace internal flows
+4. Ask the same question for each thing you find inside
 
-2. **Go deep.** Read the source code for this area carefully. Record:
-   - Internal capabilities (key functions, handlers, middleware)
-   - Entities (state, models, caches this area owns)
-   - Side effects (external calls, DB writes, queue publishes)
-   - Invariants you notice ("every write checks auth", "sessions expire after 24h")
-   - Failure points (unchecked errors, race conditions, missing validation)
+Keep going until the answer is "no, this is simple enough as a single node."
+Maximum depth: 4 levels.
 
-3. **Decide whether to go deeper.** For each entity you just recorded, ask
-   yourself: "Is this complex enough that someone would want to zoom into
-   it and see its internals?" If yes, create a sub-boundary and explore
-   its internal structure (methods as capabilities, internal state as
-   entities, error paths as failure points). Then ask again for each thing
-   you found inside. Keep going until the answer is "no, this is simple
-   enough to understand as a single node."
+Create perspectives for important areas so users can view them independently.
 
-   Maximum depth: 4 levels. Most codebases won't need more than 2-3.
+### Phase 5: Cross-Cutting Patterns
 
-   ```
-   cartographer_write_entity(kind: "boundary", name: "WorldModelStore internals",
-     parentBoundary: "boundary:service", ...)
-   cartographer_write_entity(kind: "capability", name: "writeEntity",
-     parentBoundary: "boundary:WorldModelStore internals", ...)
-   ```
+Step back. Look across the behaviors you traced. Create perspectives for
+patterns that span boundaries:
 
-   This gives the map depth. Without sub-boundaries, zooming in shows a
-   flat list — which defeats the purpose of navigable semantic zoom.
+- How data flows from entry to storage to output
+- How errors propagate and where they're handled (or not)
+- Where trust boundaries exist and how they're enforced
+- What external systems are depended on
 
-4. **Trace behavior flows** for this area:
-   ```
-   cartographer_write_slice(name: "Login flow", steps: [...])
-   ```
+You decide which cross-cutting views are worth creating. Choose the ones
+that reveal something the behavior-by-behavior view doesn't.
 
-5. **Switch back to default** before moving to the next area:
-   ```
-   cartographer_switch_perspective(name: "default")
-   ```
+### Phase 6: Synthesis
 
-Repeat for each area worth exploring. You decide how many — typically 3-6 areas
-for a medium codebase.
+Report to the user:
 
-### Phase 4: Cross-Cutting Perspectives
+1. **The behaviors** — the key stories of what this system does
+2. **What surprised you** — risks, clever patterns, missing pieces
+3. **Concerns** — things that look fragile or unclear
+4. **Perspectives** — what lenses are available to explore
 
-After deep-diving individual areas, step back and look at cross-boundary patterns.
-Create perspectives that span boundaries:
-
-- **Data flow**: how data moves from ingestion to storage to consumption
-- **Error handling**: how the system handles and recovers from failures
-- **Security surface**: where trust boundaries exist and how they're enforced
-- **External dependencies**: what the system relies on outside itself
-
-You decide which cross-cutting perspectives are worth creating. Not all of them
-will be useful for every codebase. Choose the ones that reveal something a
-boundary-by-boundary view doesn't.
-
-### Phase 5: Synthesis
-
-Switch back to default. Report to the user:
-
-1. **What you found**: summary of the system's structure and key areas
-2. **What surprised you**: anything unexpected, risky, or notably well-designed
-3. **Key flows**: the most important behavior paths
-4. **Concerns**: things that looked fragile, unclear, or potentially broken
-5. **Perspectives created**: what lenses are available and what they show
-
-Open the map. Tell the user what to explore first.
+Open the map. Tell the user which behavior to start with.
 
 ## Decision Principles
 
-- **Depth is not uniform.** A utility directory doesn't need the same attention as
-  the core domain logic. Go shallow where it's simple, deep where it's complex.
-- **Name perspectives by what they reveal**, not what they contain. "data-integrity"
-  is better than "database-related-files."
-- **Record what you notice, not just what you catalog.** An invariant you spot
-  across 5 functions is more valuable than 50 function names.
-- **Trust your judgment.** If something feels important, it probably is. If
-  something feels risky, record a failure-point.
-- **Stop when you've said what matters.** You don't need to record every entity.
-  The goal is understanding, not completeness.
+- **Lead with what happens, not what exists.** Behaviors produce understanding.
+  Parts lists don't.
+- **Boundaries emerge from behavior.** Things that participate in the same
+  flows and break together belong together.
+- **Depth is recursive and self-assessed.** You decide at each level whether
+  to go deeper. Not every entity needs internal structure.
+- **Record what you notice, not just what you catalog.** An invariant you
+  spot across 5 functions is more valuable than 50 function names.
+- **Stop when you've said what matters.** Completeness is not the goal.
+  Understanding is.
 
 ## Writing Descriptions
 
-The map is for everyone — engineers, PMs, designers, new team members. Write
-descriptions that anyone can read. Name things by what they do, not how they're
-implemented. Behavior flows should read like stories. Technical detail belongs
-in the evidence (source anchors), not the description.
+The map is for everyone. Name things by what they do. Behavior flows should
+read like stories. Technical detail belongs in the evidence, not the description.
 
 ## Evidence Rules
 
-Same as always:
-- Every fact must have evidence with source anchors
-- `proven` only for things directly observed in source
-- Include reasoning for anything below proven
-- Don't guess — if you're unsure, mark it speculative
+Every fact must have source anchors. `proven` for direct observations.
+Include reasoning for anything below proven.
