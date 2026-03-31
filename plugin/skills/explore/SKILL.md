@@ -20,7 +20,7 @@ Copy this checklist. Track progress. Do not skip items.
 ```
 Exploration Progress:
 - [ ] Orient: read project, understand what it does
-- [ ] Behaviors: trace 3-7 key behaviors end-to-end as slices
+- [ ] Behaviors: trace key behaviors end-to-end as slices (as many as the system warrants)
 - [ ] Boundaries: cluster entities by concern, record boundaries
 - [ ] Depth: create sub-boundaries (check_depth must pass)
 - [ ] Perspectives: create at least one focused perspective

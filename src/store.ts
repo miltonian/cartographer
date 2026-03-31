@@ -411,8 +411,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     }
 
     const sliceCount = this.slices.size;
-    if (sliceCount < 3) {
-      issues.push(`Only ${sliceCount} behavior slices — trace at least 3 flows`);
+    if (sliceCount === 0) {
+      issues.push('No behavior slices — trace at least one key behavior end-to-end');
     }
 
     const nonDefaultPerspectives = Array.from(this.perspectives.values()).filter(
