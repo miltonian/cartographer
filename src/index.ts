@@ -12,7 +12,15 @@ import { createRouter } from './api/routes.js';
 // ─── Configuration ─────────────────────────────────────────────
 
 const PREFERRED_PORT = parseInt(process.env.CARTOGRAPHER_PORT ?? '3847', 10);
-const PROJECT_ROOT = process.env.CARTOGRAPHER_PROJECT ?? process.cwd();
+// Resolve the project to map, most-specific first:
+//   1. CARTOGRAPHER_PROJECT — explicit override (e.g. the verification harness).
+//   2. CLAUDE_PROJECT_DIR   — set by Claude Code to the user's project. This is
+//      the correct source: start.sh cd's the process into the service dir before
+//      launch, so process.cwd() is the SERVICE, not the user's project. Reading
+//      cwd here is what made marketplace installs map the service's own code.
+//   3. process.cwd()        — fallback for manual / non-Claude-Code runs.
+const PROJECT_ROOT =
+  process.env.CARTOGRAPHER_PROJECT ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 const DATA_DIR = path.join(PROJECT_ROOT, '.cartographer');
 
 // All logging goes to stderr — stdout is reserved for MCP protocol

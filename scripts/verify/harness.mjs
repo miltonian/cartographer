@@ -242,17 +242,19 @@ async function run() {
 
   const apiOk = runStep('API assertions (data layer)', 'assert-api.mjs');
   const mcpOk = runStep('MCP write-path smoke', 'smoke-mcp.mjs');
+  const rootOk = runStep('Project-root resolution (regression)', 'assert-project-root.mjs');
 
   console.error('\n[harness] ══════════════════════════════════════════');
-  console.error(`[harness]   API data layer : ${apiOk ? 'PASS ✅' : 'FAIL ❌'}`);
-  console.error(`[harness]   MCP write path : ${mcpOk ? 'PASS ✅' : 'FAIL ❌'}`);
+  console.error(`[harness]   API data layer    : ${apiOk ? 'PASS ✅' : 'FAIL ❌'}`);
+  console.error(`[harness]   MCP write path    : ${mcpOk ? 'PASS ✅' : 'FAIL ❌'}`);
+  console.error(`[harness]   Project-root fix  : ${rootOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error('[harness] ──────────────────────────────────────────');
   console.error(`[harness]   Server LEFT UP at http://${HOST}:${port}`);
   console.error('[harness]   → Now run the Playwright visual checks (see plugin/skills/verify/SKILL.md).');
   console.error('[harness]   → When finished: node scripts/verify/harness.mjs down');
   console.error('[harness] ══════════════════════════════════════════');
 
-  if (!apiOk || !mcpOk) process.exitCode = 1;
+  if (!apiOk || !mcpOk || !rootOk) process.exitCode = 1;
 }
 
 // ─── dispatch ──────────────────────────────────────────────────

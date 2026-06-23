@@ -27,7 +27,13 @@ node scripts/verify/harness.mjs run
 This: stops any prior harness server → rebuilds the UI **iff** `ui/` is newer
 than `dist/ui` → boots source on port **3947** against the golden fixture →
 runs the **API data-layer** assertions → runs the **MCP write-path** smoke →
-prints PASS/FAIL and **leaves the server up** for the visual checks below.
+runs the **project-root resolution** regression → prints PASS/FAIL and **leaves
+the server up** for the visual checks below.
+
+The project-root regression (`assert-project-root.mjs`) guards a fixed bug: the
+server must map `CLAUDE_PROJECT_DIR` (the user's project), not its own `cwd`
+(which `start.sh` clobbers on marketplace installs). It boots an isolated server
+on a separate port and asserts `projectRoot` resolves correctly.
 
 When done: `node scripts/verify/harness.mjs down`.
 
@@ -67,6 +73,7 @@ PASS requires **all** of:
 - harness boots healthy on its port,
 - `assert-api.mjs` → 27/27 on a **fresh** boot,
 - `smoke-mcp.mjs` → all checks pass (MCP write tools round-trip),
+- `assert-project-root.mjs` → projectRoot resolves to `CLAUDE_PROJECT_DIR`,
 - UI: 8 nodes / 4 edges, semantic-zoom breadcrumb appears, flow badges + dimming
   apply, **0** console errors.
 
