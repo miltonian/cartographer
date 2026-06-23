@@ -69,3 +69,10 @@ Call `cartographer_restore` with the filename.
 Search the world-model for entities matching the pattern.
 
 Call `cartographer_query` with the provided pattern as `namePattern`.
+
+### verify
+Run the self-serve verification loop — boot the source stack against a golden
+fixture and assert every layer (MCP write → store → API → projection → rendered
+UI), including visual checks via headless Playwright.
+
+Invoke the `verify` skill. Use after changing the service, projection, or UI.

@@ -2,6 +2,8 @@ node_modules/
 dist/index.*
 dist/index/
 .cartographer/
+scripts/verify/out/
+.playwright-mcp/
 *.tsbuildinfo
 # dist/ui/ is tracked — ships with the plugin so the browser UI works on marketplace install
 .claude/worktrees/

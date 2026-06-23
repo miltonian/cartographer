@@ -1,0 +1,324 @@
+{
+  "id": "model:golden",
+  "rootPath": "FIXTURE_ROOT_PLACEHOLDER",
+  "entities": [
+    {
+      "id": "boundary:Authentication",
+      "kind": "boundary",
+      "name": "Authentication",
+      "description": "Verifies who the caller is and establishes a session.",
+      "evidence": [
+        {
+          "id": "ev:0",
+          "anchors": [
+            { "filePath": "src/auth/index.ts", "lineStart": 1, "lineEnd": 40, "snippet": "export const auth = { login, verify, session };" }
+          ],
+          "confidence": "proven",
+          "provenance": "deterministic",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "boundary:Billing",
+      "kind": "boundary",
+      "name": "Billing",
+      "description": "Charges the customer and emits receipts.",
+      "evidence": [
+        {
+          "id": "ev:1",
+          "anchors": [
+            { "filePath": "src/billing/index.ts", "lineStart": 1, "lineEnd": 60, "snippet": "export const billing = { charge, receipt };" }
+          ],
+          "confidence": "high",
+          "provenance": "inferred",
+          "reasoning": "Module groups charge + receipt behaviors behind one entry point.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "actor:Login route",
+      "kind": "actor",
+      "name": "Login route",
+      "description": "POST /login — where a sign-in attempt enters the system.",
+      "parentBoundary": "boundary:Authentication",
+      "evidence": [
+        {
+          "id": "ev:2",
+          "anchors": [
+            { "filePath": "src/auth/routes.ts", "lineStart": 12, "lineEnd": 18, "snippet": "router.post('/login', verifyCredentials)" }
+          ],
+          "confidence": "proven",
+          "provenance": "deterministic",
+          "tool": "Grep",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Verify credentials",
+      "kind": "capability",
+      "name": "Verify credentials",
+      "description": "Checks the supplied password against the stored hash.",
+      "parentBoundary": "boundary:Authentication",
+      "evidence": [
+        {
+          "id": "ev:3",
+          "anchors": [
+            { "filePath": "src/auth/verify.ts", "lineStart": 5, "lineEnd": 30, "snippet": "export async function verifyCredentials(req) { ... }" }
+          ],
+          "confidence": "high",
+          "provenance": "inferred",
+          "reasoning": "Function name + bcrypt.compare call indicate credential verification.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "entity:Session",
+      "kind": "entity",
+      "name": "Session",
+      "description": "Server-side record proving the caller is authenticated.",
+      "parentBoundary": "boundary:Authentication",
+      "evidence": [
+        {
+          "id": "ev:4",
+          "anchors": [
+            { "filePath": "src/auth/session.ts", "lineStart": 8, "lineEnd": 22, "snippet": "await sessions.insert({ userId, token, expiresAt })" }
+          ],
+          "confidence": "medium",
+          "provenance": "inferred",
+          "reasoning": "A row is inserted on successful login; treated as persisted state.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Charge card",
+      "kind": "capability",
+      "name": "Charge card",
+      "description": "Calls the payment processor to capture funds.",
+      "parentBoundary": "boundary:Billing",
+      "evidence": [
+        {
+          "id": "ev:5",
+          "anchors": [
+            { "filePath": "src/billing/charge.ts", "lineStart": 10, "lineEnd": 40, "snippet": "await stripe.charges.create({ amount, source })" }
+          ],
+          "confidence": "medium",
+          "provenance": "inferred",
+          "reasoning": "Stripe charges.create call indicates a card capture.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "side-effect:Send receipt",
+      "kind": "side-effect",
+      "name": "Send receipt",
+      "description": "Emails the customer a receipt after a successful charge.",
+      "parentBoundary": "boundary:Billing",
+      "evidence": [
+        {
+          "id": "ev:6",
+          "anchors": [
+            { "filePath": "src/billing/receipt.ts", "lineStart": 3, "lineEnd": 14, "snippet": "await mailer.send(receiptEmail(charge))" }
+          ],
+          "confidence": "low",
+          "provenance": "inferred",
+          "reasoning": "Mailer call after charge; exact trigger conditions not fully traced.",
+          "tool": "Grep",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "failure-point:Payment declined",
+      "kind": "failure-point",
+      "name": "Payment declined",
+      "description": "The processor may reject the charge; the flow must handle it.",
+      "parentBoundary": "boundary:Billing",
+      "evidence": [
+        {
+          "id": "ev:7",
+          "anchors": [
+            { "filePath": "src/billing/charge.ts", "lineStart": 41, "lineEnd": 52, "snippet": "if (err.code === 'card_declined') throw new PaymentError(err)" }
+          ],
+          "confidence": "speculative",
+          "provenance": "inferred",
+          "reasoning": "Decline branch exists; downstream handling not yet verified end-to-end.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "actor:Login route>invokes>capability:Verify credentials",
+      "kind": "invokes",
+      "source": "actor:Login route",
+      "target": "capability:Verify credentials",
+      "description": "The login route calls credential verification.",
+      "evidence": [
+        {
+          "id": "ev:8",
+          "anchors": [
+            { "filePath": "src/auth/routes.ts", "lineStart": 12, "lineEnd": 18, "snippet": "router.post('/login', verifyCredentials)" }
+          ],
+          "confidence": "proven",
+          "provenance": "deterministic",
+          "tool": "Grep",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Verify credentials>writes>entity:Session",
+      "kind": "writes",
+      "source": "capability:Verify credentials",
+      "target": "entity:Session",
+      "description": "On success, a session row is created.",
+      "evidence": [
+        {
+          "id": "ev:9",
+          "anchors": [
+            { "filePath": "src/auth/session.ts", "lineStart": 8, "lineEnd": 22, "snippet": "await sessions.insert({ userId, token, expiresAt })" }
+          ],
+          "confidence": "high",
+          "provenance": "inferred",
+          "reasoning": "verifyCredentials calls session.create on the success path.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Charge card>triggers>side-effect:Send receipt",
+      "kind": "triggers",
+      "source": "capability:Charge card",
+      "target": "side-effect:Send receipt",
+      "description": "A successful charge triggers the receipt email.",
+      "evidence": [
+        {
+          "id": "ev:10",
+          "anchors": [
+            { "filePath": "src/billing/charge.ts", "lineStart": 38, "lineEnd": 40, "snippet": "await sendReceipt(charge)" }
+          ],
+          "confidence": "proven",
+          "provenance": "deterministic",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Verify credentials>invokes>capability:Charge card",
+      "kind": "invokes",
+      "source": "capability:Verify credentials",
+      "target": "capability:Charge card",
+      "description": "Cross-boundary: an authenticated paid action proceeds to billing.",
+      "evidence": [
+        {
+          "id": "ev:11",
+          "anchors": [
+            { "filePath": "src/auth/verify.ts", "lineStart": 28, "lineEnd": 30, "snippet": "if (plan.paid) await billing.charge(user)" }
+          ],
+          "confidence": "medium",
+          "provenance": "inferred",
+          "reasoning": "Conditional call into billing on a paid plan; not all paths traced.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "slices": [
+    {
+      "id": "slice:User login",
+      "name": "User login",
+      "description": "What happens when a user signs in.",
+      "kind": "flow",
+      "steps": [
+        { "entityId": "actor:Login route", "label": "Request arrives at POST /login" },
+        { "entityId": "capability:Verify credentials", "label": "Password checked against hash" },
+        { "entityId": "entity:Session", "label": "Session row created" }
+      ],
+      "evidence": [
+        {
+          "id": "ev:12",
+          "anchors": [
+            { "filePath": "src/auth/routes.ts", "lineStart": 12, "lineEnd": 18, "snippet": "router.post('/login', verifyCredentials)" }
+          ],
+          "confidence": "high",
+          "provenance": "inferred",
+          "reasoning": "Traced the login path from route through verification to session creation.",
+          "tool": "Read",
+          "createdAt": "2026-06-22T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "perspectives": [
+    {
+      "id": "perspective:default",
+      "name": "default",
+      "description": "Full system overview — all entities",
+      "entityIds": [],
+      "sliceIds": [],
+      "isDefault": true,
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "perspective:auth",
+      "name": "auth",
+      "description": "Authentication and the login behavior",
+      "entityIds": [
+        "boundary:Authentication",
+        "actor:Login route",
+        "capability:Verify credentials",
+        "entity:Session"
+      ],
+      "sliceIds": ["slice:User login"],
+      "source": "agent",
+      "createdAt": "2026-06-22T00:00:00.000Z",
+      "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "activePerspectiveId": "perspective:default",
+  "createdAt": "2026-06-22T00:00:00.000Z",
+  "updatedAt": "2026-06-22T00:00:00.000Z"
+}
