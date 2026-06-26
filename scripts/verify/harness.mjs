@@ -226,9 +226,10 @@ async function status() {
   return alive;
 }
 
-function runStep(label, file) {
+function runStep(label, file, runner = 'node') {
   console.error(`\n[harness] ── ${label} ─────────────────────────────`);
-  const res = spawnSync('node', [path.join(__dirname, file)], {
+  const cmd = runner === 'tsx' ? TSX : 'node';
+  const res = spawnSync(cmd, [path.join(__dirname, file)], {
     cwd: REPO_ROOT,
     stdio: 'inherit',
     env: { ...process.env, CARTO_VERIFY_PORT_FILE: PORT_FILE },
@@ -243,18 +244,22 @@ async function run() {
   const apiOk = runStep('API assertions (data layer)', 'assert-api.mjs');
   const mcpOk = runStep('MCP write-path smoke', 'smoke-mcp.mjs');
   const rootOk = runStep('Project-root resolution (regression)', 'assert-project-root.mjs');
+  const unitOk = runStep('Backend unit regressions', 'assert-unit.mjs', 'tsx');
+  const cacheOk = runStep('Projection cache regression', 'assert-cache.mjs');
 
   console.error('\n[harness] ══════════════════════════════════════════');
   console.error(`[harness]   API data layer    : ${apiOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error(`[harness]   MCP write path    : ${mcpOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error(`[harness]   Project-root fix  : ${rootOk ? 'PASS ✅' : 'FAIL ❌'}`);
+  console.error(`[harness]   Backend units     : ${unitOk ? 'PASS ✅' : 'FAIL ❌'}`);
+  console.error(`[harness]   Cache invalidation: ${cacheOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error('[harness] ──────────────────────────────────────────');
   console.error(`[harness]   Server LEFT UP at http://${HOST}:${port}`);
   console.error('[harness]   → Now run the Playwright visual checks (see plugin/skills/verify/SKILL.md).');
   console.error('[harness]   → When finished: node scripts/verify/harness.mjs down');
   console.error('[harness] ══════════════════════════════════════════');
 
-  if (!apiOk || !mcpOk || !rootOk) process.exitCode = 1;
+  if (!apiOk || !mcpOk || !rootOk || !unitOk || !cacheOk) process.exitCode = 1;
 }
 
 // ─── dispatch ──────────────────────────────────────────────────

@@ -10,6 +10,22 @@ import {
 export function createRouter(store: WorldModelStore): Router {
   const router = Router();
 
+  // ─── Projection cache ────────────────────────────────────
+  // Invalidate on ANY change that can affect the projection's nodes/edges/layout.
+  // entity:updated matters because parentBoundary (which group a node nests under)
+  // is applied via the update path — an earlier version only listened for *:added,
+  // so moving an entity into a boundary left the map stale until an unrelated add.
+  // Switching/creating perspectives changes which nodes are visible — invalidated
+  // in the perspective routes below.
+  const projectionCache = new Map<string, MapProjection>();
+  let projectionsDirty = true;
+  const invalidateProjection = () => { projectionsDirty = true; };
+  store.on('entity:added', invalidateProjection);
+  store.on('entity:updated', invalidateProjection);
+  store.on('relationship:added', invalidateProjection);
+  store.on('relationship:updated', invalidateProjection);
+  store.on('model:cleared', () => { projectionsDirty = true; projectionCache.clear(); });
+
   // ─── Model Snapshot ──────────────────────────────────────
 
   router.get('/model', (_req: Request, res: Response) => {
@@ -82,6 +98,7 @@ export function createRouter(store: WorldModelStore): Router {
       res.status(404).json({ error: `Boundary not found or empty: ${boundaryId}` });
       return;
     }
+    projectionsDirty = true; // new perspective changes the projection's perspective list
     res.json({
       perspectiveId: perspective.id,
       name: perspective.name,
@@ -96,21 +113,11 @@ export function createRouter(store: WorldModelStore): Router {
       res.status(404).json({ error: `Perspective not found: ${id}` });
       return;
     }
+    projectionsDirty = true; // active perspective changed → cached __active__ projection is stale
     res.json({ switched: perspective.name });
   });
 
   // ─── Map Projection ──────────────────────────────────────
-
-  const projectionCache = new Map<string, MapProjection>();
-  let projectionsDirty = true;
-
-  // Only invalidate layout on topology changes (new nodes/edges), not evidence updates
-  store.on('entity:added', () => { projectionsDirty = true; });
-  store.on('relationship:added', () => { projectionsDirty = true; });
-  store.on('model:cleared', () => {
-    projectionsDirty = true;
-    projectionCache.clear();
-  });
 
   router.get('/projection/map', (req: Request, res: Response) => {
     // Accept ?perspective=perspective:auth to render a specific perspective

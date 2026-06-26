@@ -268,12 +268,17 @@ export function computeMapProjection(snapshot: WorldModelSnapshot): MapProjectio
     allX.push(n.x, n.x + (n.width ?? NODE_W));
     allY.push(n.y, n.y + (n.height ?? NODE_H));
   }
-  const bounds = {
-    minX: Math.min(...allX) - 40,
-    maxX: Math.max(...allX) + 40,
-    minY: Math.min(...allY) - 40,
-    maxY: Math.max(...allY) + 40,
-  };
+  // Guard against an empty node set (e.g. a model of only childless boundaries):
+  // Math.min(...[]) is Infinity / Math.max(...[]) is -Infinity, which serialize to
+  // null over HTTP and become NaN in the client. Use a degenerate-but-finite box.
+  const bounds = mapNodes.length === 0
+    ? { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+    : {
+        minX: Math.min(...allX) - 40,
+        maxX: Math.max(...allX) + 40,
+        minY: Math.min(...allY) - 40,
+        maxY: Math.max(...allY) + 40,
+      };
 
   return {
     nodes: mapNodes,

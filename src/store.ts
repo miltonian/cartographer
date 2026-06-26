@@ -649,6 +649,14 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
           if (num >= this.evidenceCounter) this.evidenceCounter = num + 1;
         }
       }
+      // Slice evidence also draws from the same ev:N counter — must be scanned on
+      // load or a newly minted evidence id can collide with a loaded slice's.
+      for (const s of data.slices ?? []) {
+        for (const ev of s.evidence ?? []) {
+          const num = parseInt(ev.id.replace('ev:', ''), 10);
+          if (num >= this.evidenceCounter) this.evidenceCounter = num + 1;
+        }
+      }
     } catch (err) {
       console.error('[cartographer] WARNING: model.json is corrupted or unreadable. Starting with empty model.', err);
       // Save the corrupted file for debugging
@@ -707,6 +715,9 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
   }
 
   restoreSnapshot(filename: string): boolean {
+    // Reject path traversal — only plain basenames inside the snapshots dir are
+    // valid. Without this, `../../etc/...` would be copied over model.json.
+    if (filename !== path.basename(filename)) return false;
     const src = path.join(this.snapshotDir, filename);
     if (!fs.existsSync(src)) return false;
     // Save current state as a snapshot before restoring
