@@ -118,6 +118,15 @@ log(`HTTP server: http://localhost:${actualPort}`);
 
 // Write the active port so the open_map tool and scripts can find it
 const portFile = path.join(DATA_DIR, 'port');
+// Diagnostics: if a DIFFERENT port is already recorded for this project, another
+// instance may be serving it. Concurrent instances each hold their own in-memory
+// store and persist to the same model.json (last-writer-wins) — surface it.
+try {
+  const existing = fs.existsSync(portFile) ? fs.readFileSync(portFile, 'utf-8').trim() : '';
+  if (existing && existing !== String(actualPort)) {
+    log(`WARNING: ${portFile} already references port ${existing}; another Cartographer instance may be serving this project. Concurrent instances can race on model.json — prefer a single session per project.`);
+  }
+} catch { /* ignore */ }
 fs.writeFileSync(portFile, String(actualPort), 'utf-8');
 
 // ─── WebSocket ─────────────────────────────────────────────────
