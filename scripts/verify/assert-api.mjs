@@ -136,6 +136,12 @@ async function main() {
       'Verify credentials writes Session and invokes Charge card');
   });
 
+  // Unknown /api route returns a clean 404 (not a hung request or the UI HTML)
+  await section('unknown api route 404', async () => {
+    const res = await fetch(`${BASE}/does-not-exist`);
+    ok('unknown /api route → 404', res.status === 404, `status=${res.status}`);
+  });
+
   report();
 }
 

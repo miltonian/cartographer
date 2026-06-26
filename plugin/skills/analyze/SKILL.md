@@ -12,9 +12,9 @@ tools are not connected.
 
 Set the project root: `cartographer_set_project`.
 
-If analyzing a specific concern (e.g., "analyze auth"), create and switch
-to a perspective first: `cartographer_create_perspective`, then
-`cartographer_switch_perspective`.
+If analyzing a specific concern (e.g., "analyze auth"), create a perspective
+first with `cartographer_create_perspective` — it auto-switches, so entities
+you write next join it. No separate `cartographer_switch_perspective` needed.
 
 ## How to Analyze
 

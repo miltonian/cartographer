@@ -21,7 +21,10 @@ fi
 DATA_DIR="${CARTOGRAPHER_DATA:-$HOME/.cartographer-service}"
 SERVICE="$DATA_DIR/repo"
 VERSION_FILE="$DATA_DIR/.version"
-TARGET_VERSION=$(python3 -c "import json; print(json.load(open('$PLUGIN_DIR/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "0.0.0")
+# Read the version with node (guaranteed present — it runs the server). The old
+# python3 probe fell back to 0.0.0 when python3 was absent, which never matched
+# the installed version → a full re-clone/install/build on EVERY launch.
+TARGET_VERSION=$(node -p "require('$PLUGIN_DIR/.claude-plugin/plugin.json').version" 2>/dev/null || echo "0.0.0")
 
 needs_install() {
   [ ! -f "$SERVICE/package.json" ] && return 0
@@ -34,19 +37,27 @@ needs_install() {
 if needs_install; then
   echo "[cartographer] Setting up service v${TARGET_VERSION}..." >&2
   mkdir -p "$DATA_DIR" >&2
-  if [ -d "$SERVICE" ]; then
+
+  fetch_ok=1
+  if [ -d "$SERVICE/.git" ]; then
     echo "[cartographer] Updating existing installation..." >&2
-    (cd "$SERVICE" && git fetch --depth 1 origin main && git reset --hard origin/main) >&2
+    (cd "$SERVICE" && git fetch --depth 1 origin main && git reset --hard origin/main) >&2 || fetch_ok=0
   else
     echo "[cartographer] Cloning repository..." >&2
-    git clone --depth 1 https://github.com/miltonian/cartographer.git "$SERVICE" >&2
+    rm -rf "$SERVICE" >&2
+    git clone --depth 1 https://github.com/miltonian/cartographer.git "$SERVICE" >&2 || fetch_ok=0
   fi
-  echo "[cartographer] Installing dependencies..." >&2
-  (cd "$SERVICE" && npm install) >&2
-  echo "[cartographer] Building UI..." >&2
-  (cd "$SERVICE" && npm run build:ui) >&2
-  echo "$TARGET_VERSION" > "$VERSION_FILE"
-  echo "[cartographer] Ready." >&2
+
+  # Only stamp the version file (which marks the install "current") if EVERY step
+  # succeeds. Otherwise a failed npm/build used to write the version anyway,
+  # leaving a broken service that never self-healed.
+  if [ "$fetch_ok" = "1" ] && (cd "$SERVICE" && echo "[cartographer] Installing dependencies..." >&2 && npm install >&2 && echo "[cartographer] Building UI..." >&2 && npm run build:ui >&2); then
+    echo "$TARGET_VERSION" > "$VERSION_FILE"
+    echo "[cartographer] Ready." >&2
+  else
+    echo "[cartographer] ERROR: setup failed (clone/install/build). Not marking installed; will retry next launch." >&2
+    exit 1
+  fi
 fi
 
 cd "$SERVICE" && exec ./node_modules/.bin/tsx src/index.ts

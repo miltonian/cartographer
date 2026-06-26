@@ -3,7 +3,9 @@
 # If a model exists, tell Claude it's available. One line, not a data dump.
 # Claude decides when to query it.
 
-MODEL="$(pwd)/.cartographer/model.json"
+# Use CLAUDE_PROJECT_DIR (same source the MCP server resolves the project from),
+# falling back to cwd — so the hook reports the SAME model the server uses.
+MODEL="${CLAUDE_PROJECT_DIR:-$(pwd)}/.cartographer/model.json"
 
 if [ ! -f "$MODEL" ]; then
   exit 0

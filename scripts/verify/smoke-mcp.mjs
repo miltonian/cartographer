@@ -59,6 +59,12 @@ async function main() {
     truthy('write_entity tool present', names.has('cartographer_write_entity'));
     truthy('get_summary tool present', names.has('cartographer_get_summary'));
 
+    // The server must advertise its real package version, not a stale literal.
+    const expectedVersion = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf-8')).version;
+    const serverInfo = client.getServerVersion?.();
+    truthy(`MCP server advertises package version (${expectedVersion}, not 0.1.0)`,
+      serverInfo?.version === expectedVersion, JSON.stringify(serverInfo));
+
     // Point at the isolated smoke project
     await client.callTool({
       name: 'cartographer_set_project',

@@ -1,7 +1,7 @@
 ---
 name: cartographer
 description: Cartographer — code understanding system
-allowed-tools: cartographer_write_entity, cartographer_write_relationship, cartographer_write_slice, cartographer_query, cartographer_get_entity, cartographer_get_summary, cartographer_open_map, cartographer_clear, Read, Grep, Glob, Bash
+allowed-tools: cartographer_set_project, cartographer_write_entity, cartographer_write_relationship, cartographer_write_slice, cartographer_query, cartographer_get_entity, cartographer_get_summary, cartographer_open_map, cartographer_snapshot, cartographer_list_snapshots, cartographer_restore, cartographer_clear, Read, Grep, Glob, Bash
 ---
 
 # /cartographer

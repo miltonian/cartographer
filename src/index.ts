@@ -39,8 +39,15 @@ if (summary.entityCount > 0) {
 
 // ─── MCP Server (stdio) ────────────────────────────────────────
 
+// Advertise the real package version, not a stale literal.
+const pkgDir = import.meta.dirname ?? __dirname;
+let pkgVersion = '0.0.0';
+try {
+  pkgVersion = JSON.parse(fs.readFileSync(path.join(pkgDir, '..', 'package.json'), 'utf-8')).version ?? '0.0.0';
+} catch { /* keep default */ }
+
 const mcpServer = new Server(
-  { name: 'cartographer', version: '0.1.0' },
+  { name: 'cartographer', version: pkgVersion },
   { capabilities: { tools: {} } },
 );
 
@@ -80,6 +87,10 @@ if (fs.existsSync(uiDistPath)) {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/ws')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(uiDistPath, 'index.html'));
+    } else {
+      // Unknown /api or /ws path: return a clean 404 rather than falling through
+      // and leaving the request hanging until the socket times out.
+      res.status(404).json({ error: `Not found: ${req.path}` });
     }
   });
 }
@@ -115,11 +126,17 @@ const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
 wss.on('connection', (ws: WebSocket) => {
   log('Browser connected via WebSocket');
+  // A client error (e.g. socket closed between accept and send) must not bubble
+  // to the global uncaughtException handler.
+  ws.on('error', (err) => log('WebSocket client error:', err.message));
   // Send current snapshot on connect
-  ws.send(JSON.stringify({
-    type: 'snapshot',
-    data: store.getSnapshot(),
-  }));
+  try {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'snapshot', data: store.getSnapshot() }));
+    }
+  } catch (err) {
+    log('Failed to send initial snapshot:', (err as Error).message);
+  }
 });
 
 function broadcast(message: object): void {
@@ -159,11 +176,13 @@ store.on('model:cleared', () => {
 // The MCP connection must stay alive for Claude Code to use tools.
 
 process.on('uncaughtException', (err) => {
-  log('Uncaught exception (keeping server alive):', err.message);
+  // Keep the MCP connection alive, but log the FULL stack — a swallowed-to-message
+  // error hid where persist/broadcast failures actually originated.
+  log('Uncaught exception (keeping server alive):', err.stack ?? err.message);
 });
 
 process.on('unhandledRejection', (reason) => {
-  log('Unhandled rejection (keeping server alive):', reason);
+  log('Unhandled rejection (keeping server alive):', reason instanceof Error ? (reason.stack ?? reason.message) : reason);
 });
 
 // ─── Graceful Shutdown ─────────────────────────────────────────
