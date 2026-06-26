@@ -7,6 +7,7 @@ import { FlowPanel } from './components/FlowPanel';
 import { PerspectiveSelector } from './components/PerspectiveSelector';
 import { Breadcrumb, type BreadcrumbSegment } from './components/Breadcrumb';
 import {
+  fetchProjection,
   fetchEntityDetails,
   fetchSummary,
   fetchSlices,
@@ -55,11 +56,8 @@ export function App() {
   const loadData = useCallback(async () => {
     try {
       const persp = perspectiveRef.current;
-      const perspParam = persp
-        ? `?perspective=${encodeURIComponent(persp)}`
-        : '';
       const [proj, sum, sl] = await Promise.all([
-        fetch(`/api/projection/map${perspParam}`).then((r) => r.json()),
+        fetchProjection(persp),
         fetchSummary(),
         fetchSlices(),
       ]);
@@ -67,7 +65,9 @@ export function App() {
       setSummary(sum);
       setSlices(sl);
     } catch {
-      // Service not ready yet
+      // Service not ready or a transient error — keep prior state; the next
+      // perspective change or WS event will retry. (Hardened fetchers throw on
+      // non-2xx so an error envelope is never committed as data.)
     }
   }, []);
 
@@ -86,26 +86,14 @@ export function App() {
   loadDataRef.current = loadData;
 
   useEffect(() => {
-    const ws = connectWebSocket((message) => {
-      setConnected(true);
-      if (
-        message.type === 'entity:added' ||
-        message.type === 'entity:updated' ||
-        message.type === 'relationship:added' ||
-        message.type === 'relationship:updated' ||
-        message.type === 'slice:added' ||
-        message.type === 'slice:updated' ||
-        message.type === 'model:cleared' ||
-        message.type === 'snapshot'
-      ) {
-        loadDataRef.current();
-      }
+    const conn = connectWebSocket({
+      // Every delivered message (snapshot or debounced model change) warrants a
+      // reload; ws.ts filters/debounces which ones come through.
+      onMessage: () => { setConnected(true); loadDataRef.current(); },
+      onConnect: () => setConnected(true),
+      onDisconnect: () => setConnected(false),
     });
-
-    ws.addEventListener('open', () => setConnected(true));
-    ws.addEventListener('close', () => setConnected(false));
-
-    return () => ws.close();
+    return () => conn.close();
   }, []);
 
   const handleNodeClick = useCallback(async (entityId: string) => {
@@ -150,6 +138,17 @@ export function App() {
   const handleCloseInspector = useCallback(() => {
     setSelectedEntity(null);
   }, []);
+
+  // Escape closes the inspector — its close button advertises "esc" but nothing
+  // was listening for the key.
+  useEffect(() => {
+    if (!selectedEntity) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleCloseInspector();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedEntity, handleCloseInspector]);
 
   const activeSlice = useMemo(
     () => (activeSliceId ? slices.find((s) => s.id === activeSliceId) ?? null : null),

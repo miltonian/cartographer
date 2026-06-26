@@ -123,20 +123,27 @@ export interface ModelSummary {
   lastUpdated: string;
 }
 
-export async function fetchProjection(): Promise<MapProjection> {
-  const res = await fetch(`${BASE}/projection/map`);
-  return res.json();
+// Throw on non-2xx so error envelopes ({error: ...}) are never returned AS data
+// (which previously got rendered as a projection/entity and crashed the render).
+// Callers either catch (keeping prior state) or fall back to a safe default.
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GET ${url} failed: HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+export async function fetchProjection(perspectiveId?: string | null): Promise<MapProjection> {
+  const q = perspectiveId ? `?perspective=${encodeURIComponent(perspectiveId)}` : '';
+  return getJson<MapProjection>(`${BASE}/projection/map${q}`);
 }
 
 export async function fetchEntityDetails(id: string): Promise<EntityDetails> {
-  const res = await fetch(`${BASE}/entities/${encodeURIComponent(id)}`);
-  return res.json();
+  return getJson<EntityDetails>(`${BASE}/entities/${encodeURIComponent(id)}`);
 }
 
 export async function fetchSlices(): Promise<BehaviorSlice[]> {
-  const res = await fetch(`${BASE}/slices`);
-  const data = await res.json();
-  return data.slices;
+  const data = await getJson<{ slices?: BehaviorSlice[] }>(`${BASE}/slices`);
+  return Array.isArray(data.slices) ? data.slices : [];
 }
 
 export async function createPerspectiveFromBoundary(
@@ -147,10 +154,10 @@ export async function createPerspectiveFromBoundary(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ boundaryId }),
   });
+  if (!res.ok) throw new Error(`Boundary has no children or was not found: ${boundaryId}`);
   return res.json();
 }
 
 export async function fetchSummary(): Promise<ModelSummary> {
-  const res = await fetch(`${BASE}/summary`);
-  return res.json();
+  return getJson<ModelSummary>(`${BASE}/summary`);
 }
