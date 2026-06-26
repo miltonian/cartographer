@@ -53,7 +53,12 @@ export function App() {
   const perspectiveRef = useRef(clientPerspective);
   perspectiveRef.current = clientPerspective;
 
+  // Monotonic request token so a slow earlier load can't overwrite a newer one
+  // (rapid perspective switches + concurrent WS reloads race otherwise).
+  const reqSeq = useRef(0);
+
   const loadData = useCallback(async () => {
+    const myReq = ++reqSeq.current;
     try {
       const persp = perspectiveRef.current;
       const [proj, sum, sl] = await Promise.all([
@@ -61,6 +66,7 @@ export function App() {
         fetchSummary(),
         fetchSlices(),
       ]);
+      if (myReq !== reqSeq.current) return; // a newer load superseded this one
       setProjection(proj);
       setSummary(sum);
       setSlices(sl);
@@ -71,12 +77,8 @@ export function App() {
     }
   }, []);
 
-  // Load on mount
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Reload when perspective changes
+  // Runs on mount AND whenever the perspective changes — a separate mount-only
+  // effect would just double the initial load.
   useEffect(() => {
     loadData();
   }, [clientPerspective, loadData]);
@@ -160,6 +162,16 @@ export function App() {
     [activeSlice],
   );
 
+  // Step numbers come from the flow's STEP ARRAY (first occurrence wins), so the
+  // map badges match the Inspector's "step X of N" — building them from a Set
+  // (as the map used to) collapsed repeated entities and mis-numbered them.
+  const activeFlowStepMap = useMemo(() => {
+    if (!activeSlice || !Array.isArray(activeSlice.steps)) return null;
+    const m = new Map<string, number>();
+    activeSlice.steps.forEach((s, i) => { if (!m.has(s.entityId)) m.set(s.entityId, i + 1); });
+    return m.size > 0 ? m : null;
+  }, [activeSlice]);
+
   const activeFlowChangeTypes = useMemo(
     () => {
       if (!activeSlice || activeSlice.kind !== 'changeset') return null;
@@ -186,6 +198,7 @@ export function App() {
               projection={projection}
               selectedEntityId={selectedEntity?.entity.id ?? null}
               activeFlowEntityIds={activeFlowEntityIds}
+              activeFlowStepMap={activeFlowStepMap}
               activeFlowChangeTypes={activeFlowChangeTypes}
               onNodeClick={handleNodeClick}
               onBoundaryClick={handleBoundaryClick}

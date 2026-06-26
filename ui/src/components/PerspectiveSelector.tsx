@@ -12,6 +12,11 @@ export function PerspectiveSelector({ perspectives, activePerspective, onSwitch 
   const visible = perspectives.filter((p) => p.source !== 'boundary');
   if (visible.length <= 1) return null;
 
+  // When the active perspective is a hidden (boundary-derived) one — i.e. you've
+  // zoomed into a boundary — highlight Overview rather than leaving no tab active.
+  const visibleIds = new Set(visible.map((p) => p.id));
+  const effectiveActive = visibleIds.has(activePerspective) ? activePerspective : 'perspective:default';
+
   return (
     <div
       style={{
@@ -31,7 +36,7 @@ export function PerspectiveSelector({ perspectives, activePerspective, onSwitch 
       }}
     >
       {visible.map((p) => {
-        const isActive = p.id === activePerspective;
+        const isActive = p.id === effectiveActive;
         return (
           <button
             key={p.id}

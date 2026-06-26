@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -165,21 +165,13 @@ interface Props {
   projection: MapProjection;
   selectedEntityId: string | null;
   activeFlowEntityIds: Set<string> | null;
+  activeFlowStepMap: Map<string, number> | null;
   activeFlowChangeTypes: Map<string, string> | null;
   onNodeClick: (entityId: string) => void;
   onBoundaryClick: (boundaryId: string) => void;
 }
 
-export function CartographerMap({ projection, selectedEntityId, activeFlowEntityIds, activeFlowChangeTypes, onNodeClick, onBoundaryClick }: Props) {
-  // Build a step-number map from the active flow
-  const activeFlowStepMap = useMemo(
-    () =>
-      activeFlowEntityIds
-        ? new Map(Array.from(activeFlowEntityIds).map((id, i) => [id, i + 1]))
-        : null,
-    [activeFlowEntityIds],
-  );
-
+export function CartographerMap({ projection, selectedEntityId, activeFlowEntityIds, activeFlowStepMap, activeFlowChangeTypes, onNodeClick, onBoundaryClick }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(
     toFlowNodes(projection, selectedEntityId, activeFlowEntityIds, activeFlowStepMap, activeFlowChangeTypes),
   );
