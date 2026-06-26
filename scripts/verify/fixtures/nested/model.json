@@ -1,0 +1,97 @@
+{
+  "id": "model:nested",
+  "rootPath": "FIXTURE_ROOT_PLACEHOLDER",
+  "entities": [
+    {
+      "id": "boundary:Service",
+      "kind": "boundary",
+      "name": "Service",
+      "description": "The local service process.",
+      "evidence": [{ "id": "ev:0", "anchors": [{ "filePath": "src/index.ts", "lineStart": 1, "lineEnd": 10, "snippet": "service" }], "confidence": "proven", "provenance": "deterministic", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Handle request",
+      "kind": "capability",
+      "name": "Handle request",
+      "description": "Top-level request handler.",
+      "parentBoundary": "boundary:Service",
+      "evidence": [{ "id": "ev:1", "anchors": [{ "filePath": "src/index.ts", "lineStart": 20, "lineEnd": 40, "snippet": "handle()" }], "confidence": "high", "provenance": "inferred", "reasoning": "entry handler", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "boundary:Store",
+      "kind": "boundary",
+      "name": "Store",
+      "description": "Persistence sub-system (a sub-boundary inside Service).",
+      "parentBoundary": "boundary:Service",
+      "evidence": [{ "id": "ev:2", "anchors": [{ "filePath": "src/store.ts", "lineStart": 1, "lineEnd": 10, "snippet": "store" }], "confidence": "proven", "provenance": "deterministic", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "entity:Cache",
+      "kind": "entity",
+      "name": "Cache",
+      "description": "In-memory cache.",
+      "parentBoundary": "boundary:Store",
+      "evidence": [{ "id": "ev:3", "anchors": [{ "filePath": "src/store.ts", "lineStart": 60, "lineEnd": 70, "snippet": "cache" }], "confidence": "medium", "provenance": "inferred", "reasoning": "map field", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Persist",
+      "kind": "capability",
+      "name": "Persist",
+      "description": "Writes to disk.",
+      "parentBoundary": "boundary:Store",
+      "evidence": [{ "id": "ev:4", "anchors": [{ "filePath": "src/store.ts", "lineStart": 80, "lineEnd": 95, "snippet": "persist()" }], "confidence": "high", "provenance": "inferred", "reasoning": "writeFileSync", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "boundary:Auth",
+      "kind": "boundary",
+      "name": "Auth",
+      "description": "A separate top-level boundary.",
+      "evidence": [{ "id": "ev:5", "anchors": [{ "filePath": "src/auth.ts", "lineStart": 1, "lineEnd": 10, "snippet": "auth" }], "confidence": "proven", "provenance": "deterministic", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "actor:Login",
+      "kind": "actor",
+      "name": "Login",
+      "description": "Login entrypoint.",
+      "parentBoundary": "boundary:Auth",
+      "evidence": [{ "id": "ev:6", "anchors": [{ "filePath": "src/auth.ts", "lineStart": 12, "lineEnd": 18, "snippet": "POST /login" }], "confidence": "proven", "provenance": "deterministic", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "capability:Handle request>invokes>capability:Persist",
+      "kind": "invokes", "source": "capability:Handle request", "target": "capability:Persist",
+      "description": "handler persists",
+      "evidence": [{ "id": "ev:7", "anchors": [{ "filePath": "src/index.ts", "lineStart": 35, "lineEnd": 37, "snippet": "store.persist()" }], "confidence": "proven", "provenance": "deterministic", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "capability:Persist>writes>entity:Cache",
+      "kind": "writes", "source": "capability:Persist", "target": "entity:Cache",
+      "description": "persist updates cache",
+      "evidence": [{ "id": "ev:8", "anchors": [{ "filePath": "src/store.ts", "lineStart": 88, "lineEnd": 90, "snippet": "cache.set()" }], "confidence": "high", "provenance": "inferred", "reasoning": "write-through", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    },
+    {
+      "id": "actor:Login>invokes>capability:Handle request",
+      "kind": "invokes", "source": "actor:Login", "target": "capability:Handle request",
+      "description": "login hits the handler",
+      "evidence": [{ "id": "ev:9", "anchors": [{ "filePath": "src/auth.ts", "lineStart": 14, "lineEnd": 16, "snippet": "handle(req)" }], "confidence": "medium", "provenance": "inferred", "reasoning": "cross-boundary", "createdAt": "2026-06-22T00:00:00.000Z" }],
+      "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z"
+    }
+  ],
+  "slices": [],
+  "perspectives": [
+    { "id": "perspective:default", "name": "default", "description": "Full system overview — all entities", "entityIds": [], "sliceIds": [], "isDefault": true, "createdAt": "2026-06-22T00:00:00.000Z", "updatedAt": "2026-06-22T00:00:00.000Z" }
+  ],
+  "activePerspectiveId": "perspective:default",
+  "createdAt": "2026-06-22T00:00:00.000Z",
+  "updatedAt": "2026-06-22T00:00:00.000Z"
+}

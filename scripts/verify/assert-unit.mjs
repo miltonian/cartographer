@@ -78,6 +78,64 @@ function snapshot(entities) {
     'model.json was overwritten by a traversed file');
 }
 
+// ── Bug 4: sub-boundary nesting (default perspective) ──
+{
+  const proj = computeMapProjection(snapshot([
+    entity('boundary', 'Outer'),
+    entity('capability', 'leaf1', 'boundary:Outer'),
+    entity('boundary', 'Inner', 'boundary:Outer'),
+    entity('capability', 'leaf2', 'boundary:Inner'),
+  ]));
+  const byId = Object.fromEntries(proj.nodes.map((n) => [n.id, n]));
+  ok('layout: Outer renders as a top-level group', byId['boundary:Outer']?.isGroup && !byId['boundary:Outer']?.parentId);
+  ok('layout: Inner nests under Outer (parentId)', byId['boundary:Inner']?.isGroup && byId['boundary:Inner']?.parentId === 'boundary:Outer');
+  ok('layout: leaf1 nests under Outer', byId['capability:leaf1']?.parentId === 'boundary:Outer');
+  ok('layout: leaf2 nests under Inner', byId['capability:leaf2']?.parentId === 'boundary:Inner');
+  const O = byId['boundary:Outer'], I = byId['boundary:Inner'];
+  ok('layout: Inner box fits within Outer', !!(I && O && I.x >= 0 && I.y >= 0 && (I.x + I.width) <= O.width && (I.y + I.height) <= O.height),
+    `Inner=(${I?.x},${I?.y},${I?.width},${I?.height}) Outer=(${O?.width},${O?.height})`);
+}
+
+// ── Bug 5: boundary with ONLY sub-boundaries still renders (doesn't vanish) ──
+{
+  const proj = computeMapProjection(snapshot([
+    entity('boundary', 'Parent'),
+    entity('boundary', 'Child', 'boundary:Parent'),
+    entity('capability', 'leaf', 'boundary:Child'),
+  ]));
+  const ids = new Set(proj.nodes.map((n) => n.id));
+  ok('layout: Parent (only sub-boundary children) still renders', ids.has('boundary:Parent'));
+  ok('layout: Child nests under Parent', proj.nodes.find((n) => n.id === 'boundary:Child')?.parentId === 'boundary:Parent');
+}
+
+// ── Bug 6: empty sub-boundary subtree is dropped ──
+{
+  const proj = computeMapProjection(snapshot([
+    entity('boundary', 'A'),
+    entity('capability', 'x', 'boundary:A'),
+    entity('boundary', 'EmptyChild', 'boundary:A'),
+  ]));
+  const ids = new Set(proj.nodes.map((n) => n.id));
+  ok('layout: A renders', ids.has('boundary:A'));
+  ok('layout: empty sub-boundary is dropped', !ids.has('boundary:EmptyChild'));
+}
+
+// ── regression: flat two-boundary layout still nests leaves, finite bounds ──
+{
+  const proj = computeMapProjection(snapshot([
+    entity('boundary', 'Auth'),
+    entity('actor', 'Login', 'boundary:Auth'),
+    entity('capability', 'Verify', 'boundary:Auth'),
+    entity('boundary', 'Billing'),
+    entity('capability', 'Charge', 'boundary:Billing'),
+  ]));
+  const byId = Object.fromEntries(proj.nodes.map((n) => [n.id, n]));
+  ok('layout(flat): Auth is a top-level group', byId['boundary:Auth']?.isGroup && !byId['boundary:Auth']?.parentId);
+  ok('layout(flat): Login nests under Auth', byId['actor:Login']?.parentId === 'boundary:Auth');
+  ok('layout(flat): Charge nests under Billing', byId['capability:Charge']?.parentId === 'boundary:Billing');
+  ok('layout(flat): bounds finite', Number.isFinite(proj.bounds.maxX) && proj.bounds.maxX > proj.bounds.minX);
+}
+
 // ── report ──
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log('\n  Backend unit regressions');
