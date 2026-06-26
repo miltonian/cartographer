@@ -1,9 +1,10 @@
 node_modules/
-dist/index.*
-dist/index/
+# Ignore all compiled output except dist/ui, which is tracked — it ships with the
+# plugin so the browser UI works on marketplace install.
+dist/*
+!dist/ui/
 .cartographer/
 scripts/verify/out/
 .playwright-mcp/
 *.tsbuildinfo
-# dist/ui/ is tracked — ships with the plugin so the browser UI works on marketplace install
 .claude/worktrees/

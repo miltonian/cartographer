@@ -246,6 +246,7 @@ async function run() {
   const rootOk = runStep('Project-root resolution (regression)', 'assert-project-root.mjs');
   const unitOk = runStep('Backend unit regressions', 'assert-unit.mjs', 'tsx');
   const cacheOk = runStep('Projection cache regression', 'assert-cache.mjs');
+  const valOk = runStep('MCP tool validation regression', 'assert-validation.mjs');
 
   console.error('\n[harness] ══════════════════════════════════════════');
   console.error(`[harness]   API data layer    : ${apiOk ? 'PASS ✅' : 'FAIL ❌'}`);
@@ -253,13 +254,14 @@ async function run() {
   console.error(`[harness]   Project-root fix  : ${rootOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error(`[harness]   Backend units     : ${unitOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error(`[harness]   Cache invalidation: ${cacheOk ? 'PASS ✅' : 'FAIL ❌'}`);
+  console.error(`[harness]   Tool validation   : ${valOk ? 'PASS ✅' : 'FAIL ❌'}`);
   console.error('[harness] ──────────────────────────────────────────');
   console.error(`[harness]   Server LEFT UP at http://${HOST}:${port}`);
   console.error('[harness]   → Now run the Playwright visual checks (see plugin/skills/verify/SKILL.md).');
   console.error('[harness]   → When finished: node scripts/verify/harness.mjs down');
   console.error('[harness] ══════════════════════════════════════════');
 
-  if (!apiOk || !mcpOk || !rootOk || !unitOk || !cacheOk) process.exitCode = 1;
+  if (!apiOk || !mcpOk || !rootOk || !unitOk || !cacheOk || !valOk) process.exitCode = 1;
 }
 
 // ─── dispatch ──────────────────────────────────────────────────

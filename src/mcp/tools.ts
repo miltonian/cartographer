@@ -407,6 +407,28 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
+    // Tool-input validation. The MCP SDK does not enforce inputSchema enums at
+    // runtime, and several fields can arrive as JSON strings — so validate here
+    // rather than let out-of-ontology / unparsed / unanchored data silently enter
+    // the model and poison ranking, layout, and the evidence-grounding invariant.
+    const errorResult = (message: string) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }],
+      isError: true,
+    });
+    const evidenceError = (ev: { anchors?: unknown; confidence?: unknown; provenance?: unknown }): string | null => {
+      const anchors = ensureParsed(ev?.anchors);
+      if (!Array.isArray(anchors) || anchors.length === 0) {
+        return 'evidence.anchors must contain at least one source anchor (every fact must be grounded in source)';
+      }
+      if (ev.confidence != null && !CONFIDENCE_LEVELS.includes(ev.confidence as Confidence)) {
+        return `invalid confidence "${ev.confidence}" (expected one of: ${CONFIDENCE_LEVELS.join(', ')})`;
+      }
+      if (ev.provenance != null && !PROVENANCE_KINDS.includes(ev.provenance as Provenance)) {
+        return `invalid provenance "${ev.provenance}" (expected one of: ${PROVENANCE_KINDS.join(', ')})`;
+      }
+      return null;
+    };
+
     switch (name) {
       case 'cartographer_write_entity': {
         const { kind, name: entityName, description, evidence, parentBoundary, metadata } =
@@ -426,6 +448,11 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
           };
 
         const ev = ensureParsed(evidence) ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
+        if (!ENTITY_KINDS.includes(kind)) {
+          return errorResult(`invalid entity kind "${kind}" (expected one of: ${ENTITY_KINDS.join(', ')})`);
+        }
+        const entEvErr = evidenceError(ev);
+        if (entEvErr) return errorResult(entEvErr);
         const result = store.writeEntity({
           kind,
           name: entityName,
@@ -439,7 +466,7 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
             supportingFacts: ev.supportingFacts,
           },
           parentBoundary,
-          metadata,
+          metadata: ensureParsed(metadata),
         });
 
         return {
@@ -469,6 +496,14 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
           };
 
         const ev2 = ensureParsed(evidence) ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
+        if (!RELATIONSHIP_KINDS.includes(kind)) {
+          return errorResult(`invalid relationship kind "${kind}" (expected one of: ${RELATIONSHIP_KINDS.join(', ')})`);
+        }
+        const relEvErr = evidenceError(ev2);
+        if (relEvErr) return errorResult(relEvErr);
+        const relWarnings: string[] = [];
+        if (!store.getEntity(source)) relWarnings.push(`source entity does not exist yet: ${source}`);
+        if (!store.getEntity(target)) relWarnings.push(`target entity does not exist yet: ${target}`);
         const result = store.writeRelationship({
           kind,
           source,
@@ -485,7 +520,7 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
         });
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(relWarnings.length ? { ...result, warnings: relWarnings } : result) }],
         };
       }
 
@@ -572,11 +607,23 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
         const parsedSteps = ensureParsed(steps);
         const parsedEvidence = ensureParsed(evidence);
         const ev3 = parsedEvidence ?? { anchors: [], confidence: 'speculative' as Confidence, provenance: 'inferred' as Provenance };
+        if (kind != null && kind !== 'flow' && kind !== 'changeset') {
+          return errorResult(`invalid slice kind "${kind}" (expected "flow" or "changeset")`);
+        }
+        const sliceEvErr = evidenceError(ev3);
+        if (sliceEvErr) return errorResult(sliceEvErr);
+        const stepList = Array.isArray(parsedSteps) ? parsedSteps : [];
+        if (stepList.length === 0) {
+          return errorResult('a slice must have at least one step');
+        }
+        const sliceWarnings: string[] = [];
+        const missingSteps = stepList.map((s) => s.entityId).filter((id) => !store.getEntity(id));
+        if (missingSteps.length > 0) sliceWarnings.push(`steps reference entities that do not exist yet: ${missingSteps.join(', ')}`);
         const result = store.writeSlice({
           name: sliceName,
           description,
           kind,
-          steps: (Array.isArray(parsedSteps) ? parsedSteps : []).map((s) => ({
+          steps: stepList.map((s) => ({
             entityId: s.entityId,
             label: s.label,
             changeType: s.changeType as import('../ontology.js').ChangeType | undefined,
@@ -592,7 +639,7 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
         });
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(sliceWarnings.length ? { ...result, warnings: sliceWarnings } : result) }],
         };
       }
 
@@ -677,6 +724,12 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
 
       case 'cartographer_set_project': {
         const { rootPath } = args as { rootPath: string };
+        if (!path.isAbsolute(rootPath)) {
+          return errorResult(`rootPath must be an absolute path (the model is stored at {rootPath}/.cartographer), got: "${rootPath}"`);
+        }
+        if (!fs.existsSync(rootPath)) {
+          return errorResult(`project path does not exist: ${rootPath}`);
+        }
         store.setProject(rootPath);
         const summary = store.getSummary();
         return {
