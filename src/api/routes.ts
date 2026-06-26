@@ -22,8 +22,10 @@ export function createRouter(store: WorldModelStore): Router {
   const invalidateProjection = () => { projectionsDirty = true; };
   store.on('entity:added', invalidateProjection);
   store.on('entity:updated', invalidateProjection);
+  store.on('entity:removed', invalidateProjection);
   store.on('relationship:added', invalidateProjection);
   store.on('relationship:updated', invalidateProjection);
+  store.on('relationship:removed', invalidateProjection);
   store.on('model:cleared', () => { projectionsDirty = true; projectionCache.clear(); });
 
   // ─── Model Snapshot ──────────────────────────────────────

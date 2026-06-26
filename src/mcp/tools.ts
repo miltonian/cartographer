@@ -393,11 +393,12 @@ const TOOLS = [
 
 export function registerTools(server: Server, store: WorldModelStore, dataDir: string): void {
   // Read port from file at call time (written by HTTP server after it binds)
-  function getPort(): number {
+  function getPort(): number | null {
     try {
-      return parseInt(fs.readFileSync(path.join(dataDir, 'port'), 'utf-8').trim(), 10);
+      const p = parseInt(fs.readFileSync(path.join(dataDir, 'port'), 'utf-8').trim(), 10);
+      return Number.isFinite(p) ? p : null;
     } catch {
-      return 3847; // fallback
+      return null; // server not running / no port file
     }
   }
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -784,6 +785,9 @@ export function registerTools(server: Server, store: WorldModelStore, dataDir: s
       case 'cartographer_open_map': {
         const { focus } = (args ?? {}) as { focus?: string };
         const activePort = getPort();
+        if (activePort === null) {
+          return errorResult('Cartographer service does not appear to be running (no active port file). It starts automatically with the plugin — if the map does not open, retry in a moment.');
+        }
         const url = focus
           ? `http://localhost:${activePort}?focus=${encodeURIComponent(focus)}`
           : `http://localhost:${activePort}`;

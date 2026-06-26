@@ -167,6 +167,12 @@ store.on('slice:added', (slice) => {
 store.on('slice:updated', (slice) => {
   broadcast({ type: 'slice:updated', data: slice });
 });
+store.on('entity:removed', (e) => {
+  broadcast({ type: 'entity:removed', data: e });
+});
+store.on('relationship:removed', (r) => {
+  broadcast({ type: 'relationship:removed', data: r });
+});
 store.on('model:cleared', () => {
   broadcast({ type: 'model:cleared', data: null });
 });
@@ -190,7 +196,13 @@ process.on('unhandledRejection', (reason) => {
 function shutdown() {
   log('Shutting down...');
   store.persistToDisk();
-  try { fs.unlinkSync(portFile); } catch { /* already gone */ }
+  try {
+    // Only remove the port file if it still points at THIS instance — don't clobber
+    // a port file another instance may have written after taking over the project.
+    if (fs.readFileSync(portFile, 'utf-8').trim() === String(actualPort)) {
+      fs.unlinkSync(portFile);
+    }
+  } catch { /* already gone */ }
   httpServer.close();
   wss.close();
   process.exit(0);

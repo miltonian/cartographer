@@ -136,6 +136,50 @@ function snapshot(entities) {
   ok('layout(flat): bounds finite', Number.isFinite(proj.bounds.maxX) && proj.bounds.maxX > proj.bounds.minX);
 }
 
+// ── Bug 7: deleteEntity emits a real removed event, not a fake entity:added ──
+{
+  const dir = path.join(TMP, 'delevent');
+  fs.mkdirSync(dir, { recursive: true });
+  const a = { anchors: [{ filePath: 'x.ts', lineStart: 1, lineEnd: 2, snippet: 'x' }], confidence: 'proven', provenance: 'deterministic' };
+  const store = new WorldModelStore(dir);
+  store.writeEntity({ kind: 'capability', name: 'gone', evidence: a });
+  let removedId = null, fakeAdded = false;
+  store.on('entity:removed', (e) => { removedId = e?.id ?? e; });
+  store.on('entity:added', () => { fakeAdded = true; });
+  store.deleteEntity('capability:gone');
+  ok('store: deleteEntity emits entity:removed', removedId === 'capability:gone', `removedId=${removedId}`);
+  ok('store: deleteEntity does not emit a fake entity:added', fakeAdded === false);
+}
+
+// ── Bug 8: restoring a CORRUPT snapshot fails safely (model preserved) ──
+{
+  const dir = path.join(TMP, 'restorecorrupt');
+  fs.mkdirSync(path.join(dir, '.cartographer'), { recursive: true });
+  const a = { anchors: [{ filePath: 'x.ts', lineStart: 1, lineEnd: 2, snippet: 'x' }], confidence: 'proven', provenance: 'deterministic' };
+  const store = new WorldModelStore(dir);
+  store.writeEntity({ kind: 'boundary', name: 'Keep', evidence: a });
+  store.saveSnapshot('good');
+  fs.writeFileSync(path.join(dir, '.cartographer', 'snapshots', 'model.corrupt.json'), '{ not valid json', 'utf-8');
+  const before = store.getSummary().entityCount;
+  const restored = store.restoreSnapshot('model.corrupt.json');
+  const after = store.getSummary().entityCount;
+  ok('store: restore of a corrupt snapshot returns false', restored === false, `returned ${restored}`);
+  ok('store: restore of a corrupt snapshot preserves the model', after === before, `before=${before} after=${after}`);
+}
+
+// ── Bug 9: over-long namePattern is capped to a literal (no ReDoS) ──
+{
+  const dir = path.join(TMP, 'redos');
+  fs.mkdirSync(dir, { recursive: true });
+  const a = { anchors: [{ filePath: 'x.ts', lineStart: 1, lineEnd: 2, snippet: 'x' }], confidence: 'proven', provenance: 'deterministic' };
+  const store = new WorldModelStore(dir);
+  store.writeEntity({ kind: 'capability', name: 'aaaaaaaaaaaaaaa', evidence: a });
+  const evil = '(a+)+$'.repeat(60); // > cap → treated as a literal substring, never matches
+  const t0 = Date.now();
+  const res = store.queryEntities({ namePattern: evil });
+  ok('store: over-long namePattern handled safely & quickly', Array.isArray(res) && res.length === 0 && (Date.now() - t0) < 500, `len=${res?.length} took ${Date.now()-t0}ms`);
+}
+
 // ── report ──
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log('\n  Backend unit regressions');

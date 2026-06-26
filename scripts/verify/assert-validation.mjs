@@ -68,6 +68,11 @@ async function main() {
     const r5 = await call(client, 'cartographer_set_project', { rootPath: 'scripts/verify/out/relpath-junk' });
     ok('set_project rejects a non-absolute path', r5.isError, JSON.stringify(r5.data));
     ok('set_project rejection created no .cartographer junk dir', !fs.existsSync(REL_JUNK));
+
+    // 6. open_map with no active port file → reports not-running, doesn't claim success
+    fs.rmSync(path.join(PROJECT, '.cartographer', 'port'), { force: true });
+    const om = await call(client, 'cartographer_open_map', {});
+    ok('open_map reports no-server when the port file is missing', om.isError, JSON.stringify(om.data));
   } catch (err) {
     ok('validation test ran', false, err.message);
   } finally {

@@ -52,6 +52,8 @@ export interface StoreEvents {
   'relationship:updated': [relationship: WorldRelationship];
   'slice:added': [slice: BehaviorSlice];
   'slice:updated': [slice: BehaviorSlice];
+  'entity:removed': [entity: { id: string }];
+  'relationship:removed': [relationship: { id: string }];
   'model:cleared': [];
 }
 
@@ -296,8 +298,13 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
 
     let nameRegex: RegExp | null = null;
     if (query.namePattern) {
-      try { nameRegex = new RegExp(query.namePattern, 'i'); }
-      catch { nameRegex = new RegExp(query.namePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+      // Cap pattern length — an over-long (or invalid) pattern is treated as a
+      // literal substring to avoid catastrophic-backtracking ReDoS on this hot path
+      // (namePattern flows in unsanitized from the HTTP query layer).
+      const escaped = query.namePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const safe = query.namePattern.length <= 200 ? query.namePattern : escaped;
+      try { nameRegex = new RegExp(safe, 'i'); }
+      catch { nameRegex = new RegExp(escaped, 'i'); }
     }
 
     for (const entity of this.entities.values()) {
@@ -440,7 +447,8 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       if (idx >= 0) p.entityIds.splice(idx, 1);
     }
     this.markDirty();
-    this.emit('entity:added', { id } as WorldEntity); // Triggers projection rebuild
+    // A real removal event (not a fake entity:added with a malformed entity).
+    this.emit('entity:removed', { id });
     return true;
   }
 
@@ -720,6 +728,11 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
     if (filename !== path.basename(filename)) return false;
     const src = path.join(this.snapshotDir, filename);
     if (!fs.existsSync(src)) return false;
+    // Validate the snapshot parses BEFORE clobbering the live model. Restoring a
+    // corrupt file used to overwrite model.json, wipe the in-memory model (the
+    // load swallows the parse error), and still report success.
+    try { JSON.parse(fs.readFileSync(src, 'utf-8')); }
+    catch { return false; }
     // Save current state as a snapshot before restoring
     this.saveSnapshot('pre-restore');
     // Replace current model
