@@ -180,6 +180,20 @@ function snapshot(entities) {
   ok('store: over-long namePattern handled safely & quickly', Array.isArray(res) && res.length === 0 && (Date.now() - t0) < 500, `len=${res?.length} took ${Date.now()-t0}ms`);
 }
 
+// ── Bug 10: persist is atomic — valid file, no leftover .tmp ──
+{
+  const dir = path.join(TMP, 'atomic');
+  fs.mkdirSync(path.join(dir, '.cartographer'), { recursive: true });
+  const a = { anchors: [{ filePath: 'x.ts', lineStart: 1, lineEnd: 2, snippet: 'x' }], confidence: 'proven', provenance: 'deterministic' };
+  const store = new WorldModelStore(dir);
+  store.writeEntity({ kind: 'boundary', name: 'X', evidence: a }); // triggers persist
+  const cartoDir = path.join(dir, '.cartographer');
+  const parsed = JSON.parse(fs.readFileSync(path.join(cartoDir, 'model.json'), 'utf-8'));
+  ok('persist: model.json is valid and contains the write', parsed.entities.some((e) => e.id === 'boundary:X'));
+  const stray = fs.readdirSync(cartoDir).filter((f) => f.includes('.tmp'));
+  ok('persist: no leftover .tmp file (atomic temp+rename)', stray.length === 0, `stray=${stray.join(',')}`);
+}
+
 // ── report ──
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log('\n  Backend unit regressions');

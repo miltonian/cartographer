@@ -688,8 +688,20 @@ export class WorldModelStore extends EventEmitter<StoreEvents> {
       clearTimeout(this.persistTimer);
       this.persistTimer = null;
     }
-    const snapshot = this.getSnapshot();
-    fs.writeFileSync(this.persistPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+    const data = JSON.stringify(this.getSnapshot(), null, 2);
+    // Atomic write: serialize to a temp file in the SAME directory, then rename
+    // over the target. rename() is atomic on POSIX, so a crash (kill -9) or a
+    // concurrent writer mid-write can never leave a truncated/corrupt model.json —
+    // a reader sees either the whole old file or the whole new one. The temp name
+    // is pid-scoped so two instances don't share it.
+    const tmp = `${this.persistPath}.tmp.${process.pid}`;
+    try {
+      fs.writeFileSync(tmp, data, 'utf-8');
+      fs.renameSync(tmp, this.persistPath);
+    } catch (err) {
+      try { fs.unlinkSync(tmp); } catch { /* best effort */ }
+      throw err;
+    }
   }
 
   // ─── Snapshots ─────────────────────────────────────────────
